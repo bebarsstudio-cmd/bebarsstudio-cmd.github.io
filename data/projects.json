@@ -1,0 +1,44 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "title": "Image to WebP Converter",
+      "description": "A powerful tool to convert images to WebP format with compression options and batch processing.",
+      "image": "imgs/webp-converter.png",
+      "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
+      "live": "#",
+      "tech": ["Python", "Flask", "Pillow"],
+      "status": "released"
+    },
+    {
+      "id": 2,
+      "title": "YouTube Downloader",
+      "description": "Download videos and audio from YouTube in various qualities with a simple web interface.",
+      "image": "imgs/youtube-downloader.png",
+      "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
+      "live": "#",
+      "tech": ["Python", "Flask", "yt-dlp"],
+      "status": "beta"
+    },
+    {
+      "id": 3,
+      "title": "Boba Clicker Game",
+      "description": "An addictive clicker game where you collect boba points and compete with friends!",
+      "image": "imgs/boba-game.png",
+      "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
+      "live": "#",
+      "tech": ["JavaScript", "HTML5", "CSS3"],
+      "status": "released"
+    },
+    {
+      "id": 4,
+      "title": "Portfolio Website",
+      "description": "Modern, responsive portfolio website showcasing projects and skills with animations.",
+      "image": "imgs/portfolio.png",
+      "github": "https://github.com/bebarsstudio-cmd",
+      "live": "https://bebarsstudio-cmd.github.io",
+      "tech": ["HTML5", "CSS3", "JavaScript", "Flask"],
+      "status": "live"
+    }
+  ]
+}

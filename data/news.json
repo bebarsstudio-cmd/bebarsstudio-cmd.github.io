@@ -1,0 +1,28 @@
+{
+  "news": [
+    {
+      "id": 1,
+      "title": "🎉 Website Launched!",
+      "content": "Welcome to my new portfolio website! Stay tuned for more updates and projects.",
+      "date": "2026-03-24",
+      "author": "BEBARS",
+      "category": "announcement"
+    },
+    {
+      "id": 2,
+      "title": "🚀 Image to WebP Converter Released",
+      "content": "The Image to WebP Converter tool is now available! Convert images to WebP format easily with compression options.",
+      "date": "2026-03-23",
+      "author": "BEBARS",
+      "category": "release"
+    },
+    {
+      "id": 3,
+      "title": "📱 YouTube Downloader Coming Soon",
+      "content": "Working on a powerful YouTube downloader tool. Coming in the next update!",
+      "date": "2026-03-22",
+      "author": "BEBARS",
+      "category": "upcoming"
+    }
+  ]
+}
