@@ -1,0 +1,45 @@
+{
+  "skills": [
+    {
+      "category": "Frontend",
+      "icon": "fa-code",
+      "skills": [
+        { "name": "HTML5/CSS3", "level": 100 },
+        { "name": "JavaScript", "level": 34 },
+        { "name": "React.js", "level": 0 }
+      ]
+    },
+    {
+      "category": "Backend",
+      "icon": "fa-server",
+      "skills": [
+        { "name": "Python/Flask", "level": 4 },
+        { "name": "SQLite/PostgreSQL", "level": 0 },
+        { "name": "Node.js", "level": 0 }
+      ]
+    },
+    {
+      "category": "Game Dev",
+      "icon": "fa-gamepad",
+      "skills": [
+        { "name": "Unity/C++ (learning)", "level": 0 },
+        { "name": "Game Design", "level": 50 },
+        { "name": "2D/3D Animation (learning)", "level": 0 }
+      ]
+    },
+    {
+      "category": "Tools",
+      "icon": "fa-tools",
+      "skills": [
+        { "name": "Git/GitHub", "level": 100 },
+        { "name": "Windows", "level": 100 },
+        { "name": "Linux/Fedora", "level": 100 }
+      ]
+    }
+  ],
+  "stats": [
+    { "name": "Python", "value": 22 },
+    { "name": "JavaScript", "value": 34 },
+    { "name": "Flask", "value": 1 }
+  ]
+}

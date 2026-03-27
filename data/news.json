@@ -3,26 +3,34 @@
     {
       "id": 1,
       "title": "🎉 Website Launched!",
-      "content": "Welcome to my new portfolio website! Stay tuned for more updates and projects.",
-      "date": "2026-03-24",
-      "author": "BEBARS",
-      "category": "announcement"
+      "content": "Welcome to my new portfolio website! Stay tuned for more updates and projects. This is your central hub for all my game development and web projects.",
+      "date": "2026-03-27",
+      "category": "announcement",
+      "author": "BEBARS"
     },
     {
       "id": 2,
       "title": "🚀 Image to WebP Converter Released",
-      "content": "The Image to WebP Converter tool is now available! Convert images to WebP format easily with compression options.",
-      "date": "2026-03-23",
-      "author": "BEBARS",
-      "category": "release"
+      "content": "The Image to WebP Converter tool is now available! Convert images to WebP format easily with compression options. Supports batch processing and multiple formats.",
+      "date": "2026-03-26",
+      "category": "release",
+      "author": "BEBARS"
     },
     {
       "id": 3,
       "title": "📱 YouTube Downloader Coming Soon",
-      "content": "Working on a powerful YouTube downloader tool. Coming in the next update!",
-      "date": "2026-03-22",
-      "author": "BEBARS",
-      "category": "upcoming"
+      "content": "Working on a powerful YouTube downloader tool. Will support multiple qualities, audio extraction, and playlist downloads. Coming in the next update!",
+      "date": "2026-03-25",
+      "category": "upcoming",
+      "author": "BEBARS"
+    },
+    {
+      "id": 4,
+      "title": "🐧 Fedora Linux Support Added",
+      "content": "All my tools now support Fedora Linux! Check out the downloads section for Linux versions of all applications.",
+      "date": "2026-03-24",
+      "category": "general",
+      "author": "BEBARS"
     }
   ]
 }
