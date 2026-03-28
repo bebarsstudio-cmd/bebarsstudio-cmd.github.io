@@ -41,7 +41,6 @@ async function initFirebase() {
         db = firebase.firestore();
         auth = firebase.auth();
         
-        // Test connection
         await db.collection('_test').doc('test').get();
         console.log("✅ Firebase connected successfully");
         firebaseAvailable = true;
@@ -59,7 +58,6 @@ async function initFirebase() {
 // Load admins from JSON/Firebase
 async function loadAdmins() {
     try {
-        // Try Firebase first
         if (firebaseAvailable && db) {
             const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
             const admins = [];
@@ -76,7 +74,6 @@ async function loadAdmins() {
         console.warn("Firebase loadAdmins failed:", error);
     }
     
-    // Fallback to JSON
     try {
         const response = await fetch('data/admins.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -117,7 +114,6 @@ async function loadAdmins() {
 async function saveAdmins(admins) {
     adminsList = admins;
     
-    // Try Firebase first
     if (firebaseAvailable && db) {
         try {
             const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
@@ -136,7 +132,6 @@ async function saveAdmins(admins) {
         }
     }
     
-    // Always save to localStorage as backup
     localStorage.setItem('admins_backup', JSON.stringify(admins));
     return true;
 }
@@ -193,13 +188,6 @@ async function updateAdmin(adminId, updates) {
     
     if (adminsList[index].id === currentAdmin.id) {
         currentAdmin = adminsList[index];
-        localStorage.setItem('admin_session', JSON.stringify({
-            id: currentAdmin.id,
-            username: currentAdmin.username,
-            displayName: currentAdmin.displayName,
-            role: currentAdmin.role,
-            loginTime: new Date().toISOString()
-        }));
     }
     
     return { success: true, message: "Admin updated successfully!" };
@@ -280,7 +268,8 @@ async function adminLogin(usernameOrEmail, password) {
         }
     }
     
-    localStorage.setItem('admin_session', JSON.stringify({
+    // Store session for this browser tab only (not auto-restored on refresh)
+    sessionStorage.setItem('admin_session', JSON.stringify({
         id: currentAdmin.id,
         username: currentAdmin.username,
         displayName: currentAdmin.displayName,
@@ -308,33 +297,9 @@ async function adminLogout() {
     isAdmin = false;
     currentUser = null;
     currentAdmin = null;
-    localStorage.removeItem('admin_session');
+    sessionStorage.removeItem('admin_session');
     
     return { success: true, message: "Logged out successfully!" };
-}
-
-// Check admin session
-async function checkAdminSession() {
-    const session = localStorage.getItem('admin_session');
-    if (session && !isAdmin) {
-        try {
-            const sessionData = JSON.parse(session);
-            await loadAdmins();
-            const admin = adminsList.find(a => a.id === sessionData.id || a.username === sessionData.username);
-            if (admin) {
-                currentAdmin = admin;
-                isAdmin = true;
-                console.log("✅ Admin session restored:", admin.displayName);
-                return true;
-            } else {
-                localStorage.removeItem('admin_session');
-            }
-        } catch (error) {
-            console.error("Session restore error:", error);
-            localStorage.removeItem('admin_session');
-        }
-    }
-    return isAdmin;
 }
 
 // Get admin list
@@ -779,7 +744,24 @@ async function initDatabase() {
     console.log("🔧 Initializing database...");
     await initFirebase();
     await loadAdmins();
-    await checkAdminSession();
+    
+    // Check if there's a session in sessionStorage (only for this tab, not auto-restored)
+    const session = sessionStorage.getItem('admin_session');
+    if (session) {
+        try {
+            const sessionData = JSON.parse(session);
+            const admin = adminsList.find(a => a.id === sessionData.id);
+            if (admin) {
+                currentAdmin = admin;
+                isAdmin = true;
+                console.log("✅ Session restored for this tab:", admin.displayName);
+            } else {
+                sessionStorage.removeItem('admin_session');
+            }
+        } catch (error) {
+            sessionStorage.removeItem('admin_session');
+        }
+    }
     
     if (!firebaseAvailable) {
         console.log("⚠️ Running in OFFLINE/BACKUP mode - using local JSON files");
