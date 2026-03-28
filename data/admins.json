@@ -1,0 +1,34 @@
+{
+  "admins": [
+    {
+      "id": 1,
+      "username": "bebars",
+      "email": "bebarsstudio@gmail.com",
+      "password": "admin1",
+      "displayName": "BEBARS",
+      "role": "super_admin",
+      "avatar": "images/Bebars.png",
+      "createdAt": "2026-03-28"
+    },
+    {
+      "id": 2,
+      "username": "ahmed",
+      "email": "ahmed@example.com",
+      "password": "admin2",
+      "displayName": "Ahmed",
+      "role": "admin",
+      "avatar": "images/ahmed.png",
+      "createdAt": "2026-03-28"
+    },
+    {
+        "id": 3,
+        "username": "hadder",
+        "email": "hadder@example.com",
+        "password": "1122334455",
+        "displayName": "Hadder",
+        "role": "admin",
+        "avatar": "images/hadder.png",
+        "createdAt": "2026-03-28"
+    }
+  ]
+}

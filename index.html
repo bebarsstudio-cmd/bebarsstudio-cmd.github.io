@@ -12,6 +12,16 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- SVG Gradient Definition -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#667eea"/>
+                <stop offset="100%" stop-color="#764ba2"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
@@ -21,10 +31,11 @@
             <ul class="nav-menu">
                 <li><a href="#home" class="nav-link active">Home</a></li>
                 <li><a href="#news" class="nav-link">NEWS</a></li>
-                <li><a href="#vs" class="nav-link">VS</a></li>
                 <li><a href="#about" class="nav-link">About</a></li>
                 <li><a href="#skills" class="nav-link">Skills</a></li>
                 <li><a href="#projects" class="nav-link">Projects</a></li>
+                <li><a href="#vs" class="nav-link">VS</a></li>
+                <li><a href="#feedback" class="nav-link">Feedback</a></li>
                 <li><a href="#contact" class="nav-link">Contact</a></li>
             </ul>
             <div class="hamburger">
@@ -59,7 +70,7 @@
                 </div>
                 <div class="hero-image">
                     <div class="image-wrapper">
-                        <img src="imgs/Bebars.png" alt="BEBARS-GAMING Avatar">
+                        <img src="images/Bebars.png" alt="BEBARS-GAMING Avatar">
                         <div class="floating-shapes">
                             <div class="shape shape-1"></div>
                             <div class="shape shape-2"></div>
@@ -79,20 +90,47 @@
         <div class="container">
             <h2 class="section-title">Latest <span>News</span></h2>
             
-            <!-- Admin Panel (hidden by default) -->
+            <!-- Admin Panel -->
             <div id="adminPanel" class="admin-panel" style="display: none;">
-                <h3><i class="fas fa-lock"></i> Admin Panel - Add News</h3>
-                <form id="newsForm" class="admin-form">
-                    <input type="text" id="newsTitle" placeholder="News Title" required>
-                    <textarea id="newsContent" rows="3" placeholder="News Content" required></textarea>
-                    <select id="newsCategory">
-                        <option value="general">General</option>
-                        <option value="announcement">Announcement</option>
-                        <option value="release">Release</option>
-                        <option value="upcoming">Upcoming</option>
-                    </select>
-                    <button type="submit" class="btn-primary">Publish News</button>
-                </form>
+                <h3><i class="fas fa-user-shield"></i> Admin Panel</h3>
+                
+                <!-- Add Admin Form (Super Admin Only) -->
+                <div class="admin-subsection" id="addAdminSection">
+                    <h4><i class="fas fa-user-plus"></i> Add New Admin</h4>
+                    <form id="addAdminForm" class="admin-form">
+                        <input type="text" id="newAdminUsername" placeholder="Username" required>
+                        <input type="email" id="newAdminEmail" placeholder="Email" required>
+                        <input type="password" id="newAdminPassword" placeholder="Password" required>
+                        <input type="text" id="newAdminDisplayName" placeholder="Display Name" required>
+                        <select id="newAdminRole">
+                            <option value="admin">Admin</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                        <button type="submit" class="btn-primary">Add Admin</button>
+                    </form>
+                </div>
+                
+                <!-- Admins List -->
+                <div class="admin-subsection">
+                    <h4><i class="fas fa-users"></i> Current Admins</h4>
+                    <div id="adminsList" class="admins-grid"></div>
+                </div>
+                
+                <!-- Add News Form -->
+                <div class="admin-subsection">
+                    <h4><i class="fas fa-newspaper"></i> Add News</h4>
+                    <form id="newsForm" class="admin-form">
+                        <input type="text" id="newsTitle" placeholder="News Title" required>
+                        <textarea id="newsContent" rows="3" placeholder="News Content" required></textarea>
+                        <select id="newsCategory">
+                            <option value="general">General</option>
+                            <option value="announcement">Announcement</option>
+                            <option value="release">Release</option>
+                            <option value="upcoming">Upcoming</option>
+                        </select>
+                        <button type="submit" class="btn-primary">Publish News</button>
+                    </form>
+                </div>
             </div>
             
             <!-- News Grid -->
@@ -102,7 +140,62 @@
         </div>
     </section>
 
-        <!-- VS Section - Bebars vs Ahmed -->
+    <!-- About Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <h2 class="section-title">About <span>Me</span></h2>
+            <div class="about-content">
+                <div class="about-text">
+                    <h3>Who Am I?</h3>
+                    <p>I'm a passionate developer who loves creating games and web applications. With a strong focus on user experience and performance, I build projects that make a difference.</p>
+                    <p>Currently working on various exciting projects including game development, web applications, and developer tools. I believe in writing clean, efficient code and continuously learning new technologies.</p>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <i class="fas fa-code"></i>
+                            <span>2+ Years Experience</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-gamepad"></i>
+                            <span>1 Games Created</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-globe"></i>
+                            <span>2+ Web Projects</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-users"></i>
+                            <span>1k+ Users</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="about-stats" id="aboutStats">
+                    <!-- Stats will be loaded from Firebase/JSON -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills" class="skills">
+        <div class="container">
+            <h2 class="section-title">My <span>Skills</span></h2>
+            <div id="skillsGrid" class="skills-grid">
+                <div class="empty-news"><i class="fas fa-spinner fa-spin"></i> Loading skills...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="projects">
+        <div class="container">
+            <h2 class="section-title">My <span>Projects</span></h2>
+            <div id="projectsGrid" class="projects-grid">
+                <div class="empty-news"><i class="fas fa-spinner fa-spin"></i> Loading projects...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VS Section - Bebars vs Ahmed -->
     <section id="vs" class="vs-section">
         <div class="container">
             <h2 class="section-title">Bebars <span>VS</span> Ahmed</h2>
@@ -112,7 +205,7 @@
                 <!-- Bebars Card -->
                 <div class="vs-card bebars-card">
                     <div class="vs-avatar">
-                        <img src="imgs/Bebars.png" alt="Bebars">
+                        <img src="images/Bebars.png" alt="Bebars">
                     </div>
                     <h3>BEBARS</h3>
                     <div class="like-counter">
@@ -132,7 +225,7 @@
                 <!-- Ahmed Card -->
                 <div class="vs-card ahmed-card">
                     <div class="vs-avatar">
-                        <img src="imgs/Ahmed.jpg" alt="Ahmed">
+                        <img src="images/Ahmed.jpg" alt="Ahmed" onerror="this.src='https://ui-avatars.com/api/?name=Ahmed&background=f39c12&color=fff&size=150'">
                     </div>
                     <h3>AHMED</h3>
                     <div class="like-counter">
@@ -157,12 +250,12 @@
             </div>
             
             <p class="vs-note">
-                <i class="fas fa-chart-line"></i> Real-time voting - Your vote counts!
+                <i class="fas fa-chart-line"></i> Real-time voting - One vote per day!
             </p>
         </div>
     </section>
 
-        <!-- Feedback Section -->
+    <!-- Feedback Section -->
     <section id="feedback" class="feedback-section">
         <div class="container">
             <h2 class="section-title">Send <span>Feedback</span></h2>
@@ -236,61 +329,6 @@
         </div>
     </section>
 
-    <!-- About Section -->
-    <section id="about" class="about">
-        <div class="container">
-            <h2 class="section-title">About <span>Me</span></h2>
-            <div class="about-content">
-                <div class="about-text">
-                    <h3>Who Am I?</h3>
-                    <p>I'm a passionate developer who loves creating games and web applications. With a strong focus on user experience and performance, I build projects that make a difference.</p>
-                    <p>Currently working on various exciting projects including game development, web applications, and developer tools. I believe in writing clean, efficient code and continuously learning new technologies.</p>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <i class="fas fa-code"></i>
-                            <span>2+ Years Experience</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-gamepad"></i>
-                            <span>1 Games Created</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-globe"></i>
-                            <span>2+ Web Projects</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-users"></i>
-                            <span>1k+ Users</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="about-stats" id="aboutStats">
-                    <!-- Stats will be loaded from skills.json -->
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Skills Section -->
-    <section id="skills" class="skills">
-        <div class="container">
-            <h2 class="section-title">My <span>Skills</span></h2>
-            <div id="skillsGrid" class="skills-grid">
-                <div class="empty-news"><i class="fas fa-spinner fa-spin"></i> Loading skills...</div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Projects Section -->
-    <section id="projects" class="projects">
-        <div class="container">
-            <h2 class="section-title">My <span>Projects</span></h2>
-            <div id="projectsGrid" class="projects-grid">
-                <div class="empty-news"><i class="fas fa-spinner fa-spin"></i> Loading projects...</div>
-            </div>
-        </div>
-    </section>
-
     <!-- Contact Section -->
     <section id="contact" class="contact">
         <div class="container">
@@ -355,30 +393,21 @@
     </div>
 
     <!-- Login Modal -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <h2><i class="fas fa-shield-alt"></i> Admin Login</h2>
-            <input type="password" id="adminPassword" placeholder="Enter Admin Password">
-            <button class="btn-primary" onclick="checkLogin()">Login</button>
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-        </div>
-    </div>
+    <div id="loginModal" class="modal"></div>
 
-
-    <!-- ========== SCRIPTS (Load in this order) ========== -->
-    <!-- 1. Firebase SDK first -->
+    <!-- ==================== SCRIPTS ==================== -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     
-    <!-- 2. Database script (Firebase operations) -->
+    <!-- EmailJS for feedback (optional) -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
+    <!-- Database Script -->
     <script src="js/database.js"></script>
     
-    <!-- 3. UI Script (animations, navigation) -->
+    <!-- UI Script -->
     <script src="js/script.js"></script>
-    <!-- ================================================ -->
-</body>
-</html>
-
 </body>
 </html>

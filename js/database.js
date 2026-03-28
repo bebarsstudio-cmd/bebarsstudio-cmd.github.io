@@ -1,5 +1,4 @@
 // ==================== FIREBASE CONFIGURATION ====================
-// REPLACE THIS with your Firebase config from the console
 const firebaseConfig = {
     apiKey: "YOUR_API_KEY",
     authDomain: "YOUR_AUTH_DOMAIN",
@@ -9,14 +8,14 @@ const firebaseConfig = {
     appId: "YOUR_APP_ID"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
-
-// ==================== DATABASE SYSTEM ====================
+// ==================== GLOBAL STATE ====================
 let isAdmin = false;
 let currentUser = null;
+let currentAdmin = null;
+let firebaseAvailable = true;
+let db = null;
+let auth = null;
+let adminsList = [];
 
 // Collections
 const COLLECTIONS = {
@@ -24,356 +23,738 @@ const COLLECTIONS = {
     PROJECTS: 'projects',
     SKILLS: 'skills',
     USERS: 'users',
-    VS: 'vs'
+    VS: 'vs',
+    ADMINS: 'admins'
 };
 
-// ==================== AUTHENTICATION ====================
-
-// Admin login with Firebase Auth
-async function adminLogin(email, password) {
+// ==================== FIREBASE INITIALIZATION ====================
+async function initFirebase() {
     try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        
-        // Check if user is admin
-        const userDoc = await db.collection(COLLECTIONS.USERS).doc(currentUser.uid).get();
-        if (!userDoc.exists || !userDoc.data().isAdmin) {
-            await auth.signOut();
-            isAdmin = false;
-            currentUser = null;
-            return { success: false, message: "You don't have admin privileges!" };
+        if (typeof firebase === 'undefined') {
+            console.warn("Firebase SDK not loaded, using JSON backup");
+            firebaseAvailable = false;
+            return false;
         }
         
-        isAdmin = true;
-        return { success: true, message: "Welcome back, Admin!" };
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        
+        await db.collection('_test').doc('test').get();
+        console.log("✅ Firebase connected successfully");
+        firebaseAvailable = true;
+        return true;
+        
     } catch (error) {
-        return { success: false, message: error.message };
+        console.error("❌ Firebase connection failed:", error);
+        firebaseAvailable = false;
+        return false;
     }
+}
+
+// ==================== ADMIN MANAGEMENT ====================
+
+// Load admins from JSON/Firebase
+async function loadAdmins() {
+    // Try Firebase first
+    if (firebaseAvailable && db) {
+        try {
+            const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
+            const admins = [];
+            snapshot.forEach(doc => {
+                admins.push({ id: doc.id, ...doc.data() });
+            });
+            if (admins.length > 0) {
+                adminsList = admins;
+                return admins;
+            }
+        } catch (error) {
+            console.warn("Firebase loadAdmins failed:", error);
+        }
+    }
+    
+    // Fallback to JSON
+    try {
+        const response = await fetch('data/admins.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        adminsList = data.admins;
+        console.log("✅ Loaded admins from JSON");
+        return adminsList;
+    } catch (error) {
+        console.log("⚠️ Could not load admins.json, using default");
+        const defaultAdmins = [
+            {
+                id: 1,
+                username: "bebars",
+                email: "bebarsstudio@gmail.com",
+                password: "admin1",
+                displayName: "BEBARS",
+                role: "super_admin",
+                avatar: "images/Bebars.png",
+                createdAt: new Date().toISOString().split('T')[0]
+            },
+            {
+                id: 2,
+                username: "ahmed",
+                email: "ahmed@example.com",
+                password: "admin2",
+                displayName: "Ahmed",
+                role: "admin",
+                avatar: "images/ahmed.png",
+                createdAt: new Date().toISOString().split('T')[0]
+            }
+        ];
+        adminsList = defaultAdmins;
+        return defaultAdmins;
+    }
+}
+
+// Save admins to Firebase/JSON
+async function saveAdmins(admins) {
+    adminsList = admins;
+    
+    // Try Firebase first
+    if (firebaseAvailable && db) {
+        try {
+            // Clear existing and save all
+            const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
+            const batch = db.batch();
+            snapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+            
+            // Save new admins
+            for (const admin of admins) {
+                await db.collection(COLLECTIONS.ADMINS).add(admin);
+            }
+            console.log("✅ Admins saved to Firebase");
+        } catch (error) {
+            console.error("Firebase saveAdmins failed:", error);
+        }
+    }
+    
+    // Always save to localStorage as backup
+    localStorage.setItem('admins_backup', JSON.stringify(admins));
+    
+    return true;
+}
+
+// Add new admin
+async function addAdmin(adminData) {
+    if (!isUserAdmin() || currentAdmin?.role !== 'super_admin') {
+        return { success: false, message: "Only super admin can add new admins!" };
+    }
+    
+    // Check if username or email exists
+    const existing = adminsList.find(a => 
+        a.username === adminData.username || a.email === adminData.email
+    );
+    
+    if (existing) {
+        return { success: false, message: "Username or email already exists!" };
+    }
+    
+    const newAdmin = {
+        id: Date.now(),
+        username: adminData.username,
+        email: adminData.email,
+        password: adminData.password,
+        displayName: adminData.displayName,
+        role: adminData.role || "admin",
+        avatar: adminData.avatar || "images/default-avatar.png",
+        createdBy: currentAdmin.username,
+        createdAt: new Date().toISOString().split('T')[0]
+    };
+    
+    adminsList.push(newAdmin);
+    await saveAdmins(adminsList);
+    
+    return { success: true, message: `Admin ${newAdmin.displayName} added successfully!` };
+}
+
+// Update admin
+async function updateAdmin(adminId, updates) {
+    if (!isUserAdmin()) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    const index = adminsList.findIndex(a => a.id === adminId);
+    if (index === -1) {
+        return { success: false, message: "Admin not found!" };
+    }
+    
+    // Only super admin can modify other admins
+    if (currentAdmin.role !== 'super_admin' && adminsList[index].id !== currentAdmin.id) {
+        return { success: false, message: "You can only edit your own profile!" };
+    }
+    
+    adminsList[index] = { ...adminsList[index], ...updates };
+    await saveAdmins(adminsList);
+    
+    // Update current session if editing self
+    if (adminsList[index].id === currentAdmin.id) {
+        currentAdmin = adminsList[index];
+        localStorage.setItem('admin_session', JSON.stringify({
+            username: currentAdmin.username,
+            displayName: currentAdmin.displayName,
+            role: currentAdmin.role,
+            loginTime: new Date().toISOString()
+        }));
+    }
+    
+    return { success: true, message: "Admin updated successfully!" };
+}
+
+// Delete admin
+async function deleteAdmin(adminId) {
+    if (!isUserAdmin() || currentAdmin?.role !== 'super_admin') {
+        return { success: false, message: "Only super admin can delete admins!" };
+    }
+    
+    if (adminId === currentAdmin.id) {
+        return { success: false, message: "You cannot delete yourself!" };
+    }
+    
+    const index = adminsList.findIndex(a => a.id === adminId);
+    if (index === -1) {
+        return { success: false, message: "Admin not found!" };
+    }
+    
+    adminsList.splice(index, 1);
+    await saveAdmins(adminsList);
+    
+    return { success: true, message: "Admin deleted successfully!" };
+}
+
+// Verify admin credentials
+async function verifyAdminCredentials(usernameOrEmail, password) {
+    await loadAdmins();
+    
+    const admin = adminsList.find(a => 
+        (a.username === usernameOrEmail || a.email === usernameOrEmail) && 
+        a.password === password
+    );
+    
+    if (admin) {
+        return {
+            success: true,
+            admin: admin,
+            message: `Welcome back, ${admin.displayName}!`
+        };
+    }
+    
+    return {
+        success: false,
+        message: "Invalid username/email or password!"
+    };
+}
+
+// Admin login
+async function adminLogin(usernameOrEmail, password) {
+    const jsonResult = await verifyAdminCredentials(usernameOrEmail, password);
+    
+    if (!jsonResult.success) {
+        return jsonResult;
+    }
+    
+    currentAdmin = jsonResult.admin;
+    
+    if (firebaseAvailable && auth) {
+        try {
+            const userCredential = await auth.signInWithEmailAndPassword(
+                currentAdmin.email, 
+                password
+            );
+            currentUser = userCredential.user;
+            
+            await db.collection(COLLECTIONS.USERS).doc(currentUser.uid).set({
+                email: currentAdmin.email,
+                username: currentAdmin.username,
+                displayName: currentAdmin.displayName,
+                role: currentAdmin.role,
+                isAdmin: true
+            }, { merge: true });
+            
+        } catch (firebaseError) {
+            console.warn("Firebase auth failed, using JSON only:", firebaseError);
+        }
+    }
+    
+    isAdmin = true;
+    
+    localStorage.setItem('admin_session', JSON.stringify({
+        id: currentAdmin.id,
+        username: currentAdmin.username,
+        displayName: currentAdmin.displayName,
+        role: currentAdmin.role,
+        loginTime: new Date().toISOString()
+    }));
+    
+    return {
+        success: true,
+        message: jsonResult.message,
+        admin: currentAdmin
+    };
 }
 
 // Admin logout
 async function adminLogout() {
-    try {
-        await auth.signOut();
-        isAdmin = false;
-        currentUser = null;
-        return { success: true, message: "Logged out successfully!" };
-    } catch (error) {
-        return { success: false, message: error.message };
+    if (firebaseAvailable && auth) {
+        try {
+            await auth.signOut();
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
     }
+    
+    isAdmin = false;
+    currentUser = null;
+    currentAdmin = null;
+    localStorage.removeItem('admin_session');
+    
+    return { success: true, message: "Logged out successfully!" };
 }
 
-// Check if user is admin
+// Check admin session
+async function checkAdminSession() {
+    const session = localStorage.getItem('admin_session');
+    if (session && !isAdmin) {
+        try {
+            const sessionData = JSON.parse(session);
+            await loadAdmins();
+            const admin = adminsList.find(a => a.username === sessionData.username);
+            if (admin) {
+                currentAdmin = admin;
+                isAdmin = true;
+                return true;
+            }
+        } catch (error) {
+            console.error("Session restore error:", error);
+        }
+    }
+    return isAdmin;
+}
+
+// Get admin list
+async function getAdminsList() {
+    await loadAdmins();
+    return adminsList;
+}
+
+// Get current admin
+function getCurrentAdmin() {
+    return currentAdmin;
+}
+
 function isUserAdmin() {
     return isAdmin;
 }
 
-// Get current admin status for UI
 function getAdminStatus() {
-    return { isAdmin: isAdmin, user: currentUser };
+    return { 
+        isAdmin: isAdmin, 
+        user: currentUser,
+        admin: currentAdmin
+    };
 }
 
-// ==================== NEWS OPERATIONS ====================
+// ==================== JSON BACKUP LOADERS ====================
 
-// Load news from Firestore
-async function loadNews() {
+async function loadFromJSONFile(filename) {
     try {
-        const snapshot = await db.collection(COLLECTIONS.NEWS)
-            .orderBy('date', 'desc')
-            .get();
-        
-        const news = [];
-        snapshot.forEach(doc => {
-            news.push({ id: doc.id, ...doc.data() });
-        });
-        
-        return news;
+        const response = await fetch(`data/${filename}.json`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        console.log(`✅ Loaded ${filename}.json backup`);
+        return data;
     } catch (error) {
-        console.error("Error loading news:", error);
-        return [];
-    }
-}
-
-// Add new news
-async function addNews(title, content, category) {
-    if (!isAdmin) {
-        return { success: false, message: "Admin access required!" };
-    }
-    
-    try {
-        const newNews = {
-            title: title,
-            content: content,
-            date: new Date().toISOString().split('T')[0],
-            category: category,
-            author: "BEBARS",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        await db.collection(COLLECTIONS.NEWS).add(newNews);
-        return { success: true, message: "News published successfully!" };
-    } catch (error) {
-        console.error("Error adding news:", error);
-        return { success: false, message: "Error publishing news" };
-    }
-}
-
-// Delete news
-async function deleteNews(id) {
-    if (!isAdmin) {
-        return { success: false, message: "Admin access required!" };
-    }
-    
-    try {
-        await db.collection(COLLECTIONS.NEWS).doc(id).delete();
-        return { success: true, message: "News deleted successfully!" };
-    } catch (error) {
-        console.error("Error deleting news:", error);
-        return { success: false, message: "Error deleting news" };
-    }
-}
-
-// Edit news
-async function editNews(id, newTitle, newContent) {
-    if (!isAdmin) {
-        return { success: false, message: "Admin access required!" };
-    }
-    
-    try {
-        await db.collection(COLLECTIONS.NEWS).doc(id).update({
-            title: newTitle,
-            content: newContent,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        return { success: true, message: "News updated successfully!" };
-    } catch (error) {
-        console.error("Error updating news:", error);
-        return { success: false, message: "Error updating news" };
-    }
-}
-
-// Get single news item
-async function getNewsById(id) {
-    try {
-        const doc = await db.collection(COLLECTIONS.NEWS).doc(id).get();
-        if (doc.exists) {
-            return { id: doc.id, ...doc.data() };
-        }
-        return null;
-    } catch (error) {
-        console.error("Error getting news:", error);
+        console.log(`⚠️ Could not load ${filename}.json:`, error);
         return null;
     }
 }
 
-// ==================== PROJECTS OPERATIONS ====================
-
-// Load projects from Firestore
-async function loadProjects() {
-    try {
-        const snapshot = await db.collection(COLLECTIONS.PROJECTS)
-            .orderBy('order', 'asc')
-            .get();
-        
-        const projects = [];
-        snapshot.forEach(doc => {
-            projects.push({ id: doc.id, ...doc.data() });
-        });
-        
-        return projects;
-    } catch (error) {
-        console.error("Error loading projects:", error);
-        return [];
-    }
+async function loadNewsFromJSON() {
+    const data = await loadFromJSONFile('news');
+    return data?.news || [];
 }
 
-// ==================== SKILLS OPERATIONS ====================
+async function loadProjectsFromJSON() {
+    const data = await loadFromJSONFile('projects');
+    return data?.projects || [];
+}
 
-// Load skills from Firestore
-async function loadSkills() {
-    try {
-        const doc = await db.collection(COLLECTIONS.SKILLS).doc('main').get();
-        if (doc.exists) {
-            return doc.data();
-        } else {
-            // Create default skills if not exists
-            const defaultSkills = {
+async function loadSkillsFromJSON() {
+    const data = await loadFromJSONFile('skills');
+    if (data) {
+        return { skills: data.skills || [], stats: data.stats || [] };
+    }
+    return {
+        skills: [
+            {
+                category: "Frontend",
+                icon: "fa-code",
                 skills: [
-                    {
-                        category: "Frontend",
-                        icon: "fa-code",
-                        skills: [
-                            { name: "HTML5/CSS3", level: 100 },
-                            { name: "JavaScript", level: 34 },
-                            { name: "React.js", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Backend",
-                        icon: "fa-server",
-                        skills: [
-                            { name: "Python/Flask", level: 4 },
-                            { name: "SQLite/PostgreSQL", level: 0 },
-                            { name: "Node.js", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Game Dev",
-                        icon: "fa-gamepad",
-                        skills: [
-                            { name: "Unity/C++ (learning)", level: 0 },
-                            { name: "Game Design", level: 50 },
-                            { name: "2D/3D Animation (learning)", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Tools",
-                        icon: "fa-tools",
-                        skills: [
-                            { name: "Git/GitHub", level: 100 },
-                            { name: "Windows", level: 100 },
-                            { name: "Linux/Fedora", level: 100 }
-                        ]
-                    }
-                ],
-                stats: [
-                    { name: "Python", value: 22 },
-                    { name: "JavaScript", value: 34 },
-                    { name: "Flask", value: 1 }
+                    { name: "HTML5/CSS3", level: 100 },
+                    { name: "JavaScript", level: 34 },
+                    { name: "React.js", level: 0 }
                 ]
-            };
-            await db.collection(COLLECTIONS.SKILLS).doc('main').set(defaultSkills);
-            return defaultSkills;
-        }
-    } catch (error) {
-        console.error("Error loading skills:", error);
-        return { skills: [], stats: [] };
-    }
+            },
+            {
+                category: "Backend",
+                icon: "fa-server",
+                skills: [
+                    { name: "Python/Flask", level: 4 },
+                    { name: "SQLite/PostgreSQL", level: 0 },
+                    { name: "Node.js", level: 0 }
+                ]
+            },
+            {
+                category: "Game Dev",
+                icon: "fa-gamepad",
+                skills: [
+                    { name: "Unity/C++ (learning)", level: 0 },
+                    { name: "Game Design", level: 50 },
+                    { name: "2D/3D Animation (learning)", level: 0 }
+                ]
+            },
+            {
+                category: "Tools",
+                icon: "fa-tools",
+                skills: [
+                    { name: "Git/GitHub", level: 100 },
+                    { name: "Windows", level: 100 },
+                    { name: "Linux/Fedora", level: 100 }
+                ]
+            }
+        ],
+        stats: [
+            { name: "Python", value: 22 },
+            { name: "JavaScript", value: 34 },
+            { name: "Flask", value: 1 }
+        ]
+    };
 }
 
-// ==================== VS SECTION OPERATIONS ====================
-
-// Load likes from Firebase
-async function loadLikes() {
+async function loadLikesFromLocal() {
     try {
-        const doc = await db.collection(COLLECTIONS.VS).doc('likes').get();
-        if (doc.exists) {
-            return doc.data();
-        } else {
-            const defaultLikes = { bebars: 0, ahmed: 0 };
-            await db.collection(COLLECTIONS.VS).doc('likes').set(defaultLikes);
-            return defaultLikes;
+        const saved = localStorage.getItem('vs_likes_backup');
+        if (saved) {
+            return JSON.parse(saved);
         }
+        return { bebars: 0, ahmed: 0 };
     } catch (error) {
-        console.error("Error loading likes:", error);
         return { bebars: 0, ahmed: 0 };
     }
 }
 
-// Add like to a user
+async function saveLikesToLocal(likes) {
+    try {
+        localStorage.setItem('vs_likes_backup', JSON.stringify(likes));
+    } catch (error) {
+        console.error("Error saving likes to localStorage:", error);
+    }
+}
+
+// ==================== NEWS OPERATIONS ====================
+
+async function loadNews() {
+    if (firebaseAvailable && db) {
+        try {
+            const snapshot = await db.collection(COLLECTIONS.NEWS)
+                .orderBy('date', 'desc')
+                .get();
+            
+            const news = [];
+            snapshot.forEach(doc => {
+                news.push({ id: doc.id, ...doc.data() });
+            });
+            
+            if (news.length > 0) {
+                return news;
+            }
+        } catch (error) {
+            console.warn("Firebase loadNews failed, trying JSON backup:", error);
+        }
+    }
+    
+    console.log("📁 Using JSON backup for news");
+    return await loadNewsFromJSON();
+}
+
+async function addNews(title, content, category) {
+    if (!isUserAdmin()) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    const newNews = {
+        id: Date.now(),
+        title: title,
+        content: content,
+        date: new Date().toISOString().split('T')[0],
+        category: category,
+        author: currentAdmin?.displayName || "Admin",
+        authorUsername: currentAdmin?.username || "admin",
+        createdAt: new Date().toISOString()
+    };
+    
+    if (firebaseAvailable && db) {
+        try {
+            await db.collection(COLLECTIONS.NEWS).add(newNews);
+            return { success: true, message: "News published successfully!" };
+        } catch (error) {
+            console.error("Firebase addNews failed:", error);
+        }
+    }
+    
+    try {
+        const localNews = JSON.parse(localStorage.getItem('news_backup') || '[]');
+        localNews.unshift(newNews);
+        localStorage.setItem('news_backup', JSON.stringify(localNews));
+        return { success: true, message: "News saved locally! (Backup Mode)" };
+    } catch (error) {
+        return { success: false, message: "Error saving news" };
+    }
+}
+
+async function deleteNews(id) {
+    if (!isUserAdmin()) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    if (firebaseAvailable && db) {
+        try {
+            await db.collection(COLLECTIONS.NEWS).doc(id).delete();
+            return { success: true, message: "News deleted successfully!" };
+        } catch (error) {
+            console.error("Firebase delete failed:", error);
+        }
+    }
+    
+    try {
+        let localNews = JSON.parse(localStorage.getItem('news_backup') || '[]');
+        localNews = localNews.filter(item => item.id.toString() !== id.toString());
+        localStorage.setItem('news_backup', JSON.stringify(localNews));
+        return { success: true, message: "News deleted locally! (Backup Mode)" };
+    } catch (error) {
+        return { success: false, message: "Error deleting news" };
+    }
+}
+
+async function editNews(id, newTitle, newContent) {
+    if (!isUserAdmin()) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    if (firebaseAvailable && db) {
+        try {
+            await db.collection(COLLECTIONS.NEWS).doc(id).update({
+                title: newTitle,
+                content: newContent,
+                updatedBy: currentAdmin?.username || "admin",
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            return { success: true, message: "News updated successfully!" };
+        } catch (error) {
+            console.error("Firebase edit failed:", error);
+        }
+    }
+    
+    try {
+        let localNews = JSON.parse(localStorage.getItem('news_backup') || '[]');
+        const index = localNews.findIndex(item => item.id.toString() === id.toString());
+        if (index !== -1) {
+            localNews[index].title = newTitle;
+            localNews[index].content = newContent;
+            localNews[index].updatedBy = currentAdmin?.username || "admin";
+            localStorage.setItem('news_backup', JSON.stringify(localNews));
+        }
+        return { success: true, message: "News updated locally! (Backup Mode)" };
+    } catch (error) {
+        return { success: false, message: "Error updating news" };
+    }
+}
+
+async function getNewsById(id) {
+    if (firebaseAvailable && db) {
+        try {
+            const doc = await db.collection(COLLECTIONS.NEWS).doc(id).get();
+            if (doc.exists) {
+                return { id: doc.id, ...doc.data() };
+            }
+        } catch (error) {
+            console.error("Error getting news:", error);
+        }
+    }
+    
+    try {
+        const localNews = JSON.parse(localStorage.getItem('news_backup') || '[]');
+        return localNews.find(item => item.id.toString() === id.toString()) || null;
+    } catch (error) {
+        return null;
+    }
+}
+
+// ==================== PROJECTS & SKILLS ====================
+
+async function loadProjects() {
+    if (firebaseAvailable && db) {
+        try {
+            const snapshot = await db.collection(COLLECTIONS.PROJECTS)
+                .orderBy('order', 'asc')
+                .get();
+            
+            const projects = [];
+            snapshot.forEach(doc => {
+                projects.push({ id: doc.id, ...doc.data() });
+            });
+            
+            if (projects.length > 0) {
+                return projects;
+            }
+        } catch (error) {
+            console.warn("Firebase loadProjects failed:", error);
+        }
+    }
+    
+    return await loadProjectsFromJSON();
+}
+
+async function loadSkills() {
+    if (firebaseAvailable && db) {
+        try {
+            const doc = await db.collection(COLLECTIONS.SKILLS).doc('main').get();
+            if (doc.exists) {
+                return doc.data();
+            }
+        } catch (error) {
+            console.warn("Firebase loadSkills failed:", error);
+        }
+    }
+    
+    return await loadSkillsFromJSON();
+}
+
+// ==================== VS SECTION ====================
+
+async function loadLikes() {
+    if (firebaseAvailable && db) {
+        try {
+            const doc = await db.collection(COLLECTIONS.VS).doc('likes').get();
+            if (doc.exists) {
+                return doc.data();
+            }
+            const defaultLikes = { bebars: 0, ahmed: 0 };
+            await db.collection(COLLECTIONS.VS).doc('likes').set(defaultLikes);
+            return defaultLikes;
+        } catch (error) {
+            console.warn("Firebase loadLikes failed:", error);
+        }
+    }
+    
+    return await loadLikesFromLocal();
+}
+
 async function addLikeToDatabase(user) {
     if (!user || (user !== 'bebars' && user !== 'ahmed')) {
         return { success: false, message: "Invalid user" };
     }
     
-    try {
-        // Check if user already voted today
-        const lastVote = localStorage.getItem(`vote_${user}`);
-        const today = new Date().toDateString();
-        
-        if (lastVote === today) {
-            return { success: false, message: `You already voted for ${user.toUpperCase()} today! Come back tomorrow!` };
+    const lastVote = localStorage.getItem(`vote_${user}`);
+    const today = new Date().toDateString();
+    
+    if (lastVote === today) {
+        return { success: false, message: `You already voted for ${user.toUpperCase()} today!` };
+    }
+    
+    if (firebaseAvailable && db) {
+        try {
+            const vsRef = db.collection(COLLECTIONS.VS).doc('likes');
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(vsRef);
+                const currentLikes = doc.exists ? doc.data() : { bebars: 0, ahmed: 0 };
+                currentLikes[user] = (currentLikes[user] || 0) + 1;
+                transaction.set(vsRef, currentLikes);
+            });
+            
+            localStorage.setItem(`vote_${user}`, today);
+            return { success: true, message: `Thanks for supporting ${user.toUpperCase()}! 🎉` };
+        } catch (error) {
+            console.error("Firebase addLike failed:", error);
         }
-        
-        const vsRef = db.collection(COLLECTIONS.VS).doc('likes');
-        await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(vsRef);
-            const currentLikes = doc.exists ? doc.data() : { bebars: 0, ahmed: 0 };
-            currentLikes[user] = (currentLikes[user] || 0) + 1;
-            transaction.set(vsRef, currentLikes);
-        });
-        
-        // Save vote date
+    }
+    
+    try {
+        let likes = await loadLikesFromLocal();
+        likes[user] = (likes[user] || 0) + 1;
+        await saveLikesToLocal(likes);
         localStorage.setItem(`vote_${user}`, today);
-        return { success: true, message: `Thanks for supporting ${user.toUpperCase()}! 🎉` };
-        
+        return { success: true, message: `Thanks for supporting ${user.toUpperCase()}! (Offline Mode) 🎉` };
     } catch (error) {
-        console.error("Error adding like:", error);
-        return { success: false, message: "Error adding like. Please try again!" };
+        return { success: false, message: "Error adding like!" };
     }
 }
 
-// Get current like counts
 async function getLikeCounts() {
     return await loadLikes();
 }
 
-// Setup real-time listener for VS likes
 function setupVSLiveListener(callback) {
-    return db.collection(COLLECTIONS.VS).doc('likes').onSnapshot((doc) => {
-        if (doc.exists && callback) {
-            callback(doc.data());
-        }
-    });
+    if (firebaseAvailable && db) {
+        return db.collection(COLLECTIONS.VS).doc('likes').onSnapshot((doc) => {
+            if (doc.exists && callback) {
+                callback(doc.data());
+            }
+        });
+    }
+    return null;
 }
 
-// ==================== FEEDBACK OPERATIONS ====================
+// ==================== FEEDBACK ====================
 
-// Send feedback to email via EmailJS
 async function sendFeedbackToEmail(feedbackData) {
+    if (typeof emailjs !== 'undefined') {
+        try {
+            emailjs.init("YOUR_EMAILJS_PUBLIC_KEY");
+            const response = await emailjs.send(
+                "YOUR_SERVICE_ID",
+                "YOUR_TEMPLATE_ID",
+                {
+                    from_name: feedbackData.name,
+                    from_email: feedbackData.email,
+                    feedback_type: feedbackData.type,
+                    subject: feedbackData.subject,
+                    message: feedbackData.message,
+                    page_url: feedbackData.page_url || '',
+                    to_email: "bebarsstudio@gmail.com"
+                }
+            );
+            if (response.status === 200) {
+                return { success: true, message: "Feedback sent successfully!" };
+            }
+        } catch (error) {
+            console.error("EmailJS error:", error);
+        }
+    }
+    
     try {
-        // EmailJS configuration - Replace with your actual keys
-        // Sign up at https://www.emailjs.com/ to get these
-        const EMAILJS_CONFIG = {
-            publicKey: "YOUR_EMAILJS_PUBLIC_KEY",
-            serviceId: "YOUR_EMAILJS_SERVICE_ID",
-            templateId: "YOUR_EMAILJS_TEMPLATE_ID"
-        };
-        
-        // Initialize EmailJS if not already done
-        if (typeof emailjs !== 'undefined' && !window.emailjsInitialized) {
-            emailjs.init(EMAILJS_CONFIG.publicKey);
-            window.emailjsInitialized = true;
-        }
-        
-        const templateParams = {
-            from_name: feedbackData.name,
-            from_email: feedbackData.email,
-            feedback_type: feedbackData.type,
-            subject: feedbackData.subject,
-            message: feedbackData.message,
-            page_url: feedbackData.page_url || '',
-            to_email: "bebarsstudio@gmail.com",
-            timestamp: new Date().toLocaleString()
-        };
-        
-        const response = await emailjs.send(
-            EMAILJS_CONFIG.serviceId,
-            EMAILJS_CONFIG.templateId,
-            templateParams
-        );
-        
-        if (response.status === 200) {
-            return { success: true, message: "Feedback sent successfully! I'll get back to you soon." };
-        } else {
-            throw new Error("Failed to send");
-        }
-        
+        const feedbacks = JSON.parse(localStorage.getItem('feedbacks_backup') || '[]');
+        feedbacks.push({ ...feedbackData, timestamp: new Date().toISOString() });
+        localStorage.setItem('feedbacks_backup', JSON.stringify(feedbacks));
+        return { success: true, message: "Feedback saved locally! Please email: bebarsstudio@gmail.com" };
     } catch (error) {
-        console.error("Error sending feedback:", error);
-        return { success: false, message: "Failed to send. Please email directly: bebarsstudio@gmail.com" };
+        return { success: false, message: "Failed to send. Please email: bebarsstudio@gmail.com" };
     }
 }
 
 // ==================== HELPER FUNCTIONS ====================
 
-// Format date for display
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// Get category display name
 function getCategoryName(category) {
     const categories = {
         'announcement': '📢 ANNOUNCEMENT',
@@ -384,9 +765,32 @@ function getCategoryName(category) {
     return categories[category] || '📰 NEWS';
 }
 
-// Escape HTML to prevent XSS
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ==================== INITIALIZATION ====================
+
+async function initDatabase() {
+    await initFirebase();
+    await loadAdmins();
+    await checkAdminSession();
+    
+    if (!firebaseAvailable) {
+        const notification = document.createElement('div');
+        notification.className = 'backup-notification';
+        notification.innerHTML = `
+            <i class="fas fa-database"></i>
+            Running in offline mode - using local data
+            <button onclick="this.parentElement.remove()">×</button>
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
+    }
+    
+    return firebaseAvailable;
+}
+
+document.addEventListener('DOMContentLoaded', initDatabase);

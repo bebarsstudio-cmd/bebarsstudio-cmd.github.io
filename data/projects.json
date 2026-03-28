@@ -3,42 +3,46 @@
     {
       "id": 1,
       "title": "Image to WebP Converter",
-      "description": "A powerful tool to convert images to WebP format with compression options and batch processing. Supports JPG, PNG, GIF, and more.",
+      "description": "A powerful tool to convert images to WebP format with compression options and batch processing.",
       "image": "images/soon.png",
       "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
       "live": "#",
-      "tech": ["Python", "Flask", "Pillow", "WebP"],
-      "status": "released"
+      "tech": ["Python", "Flask", "Pillow"],
+      "status": "released",
+      "order": 1
     },
     {
       "id": 2,
       "title": "YouTube Downloader",
-      "description": "Download videos and audio from YouTube in various qualities with a simple web interface. Supports MP4, MP3, and playlist downloads.",
+      "description": "Download videos and audio from YouTube in various qualities with a simple web interface.",
       "image": "images/soon.png",
       "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
       "live": "#",
-      "tech": ["Python", "Flask", "yt-dlp", "FFmpeg"],
-      "status": "beta"
+      "tech": ["Python", "Flask", "yt-dlp"],
+      "status": "beta",
+      "order": 2
     },
     {
       "id": 3,
       "title": "Boba Clicker Game",
-      "description": "An addictive clicker game where you collect boba points, unlock achievements, and compete with friends on the leaderboard!",
+      "description": "An addictive clicker game where you collect boba points and compete with friends!",
       "image": "images/soon.png",
       "github": "https://github.com/bebarsstudio-cmd/my-flask-app",
       "live": "#",
-      "tech": ["JavaScript", "HTML5", "CSS3", "LocalStorage"],
-      "status": "released"
+      "tech": ["JavaScript", "HTML5", "CSS3"],
+      "status": "released",
+      "order": 3
     },
     {
       "id": 4,
       "title": "Portfolio Website",
-      "description": "Modern, responsive portfolio website showcasing projects and skills with smooth animations and a fully functional news system.",
+      "description": "Modern, responsive portfolio website showcasing projects and skills with animations.",
       "image": "images/portofolio.png",
       "github": "https://github.com/bebarsstudio-cmd",
       "live": "https://bebarsstudio-cmd.github.io",
-      "tech": ["HTML5", "CSS3", "JavaScript", "JSON"],
-      "status": "live"
+      "tech": ["HTML5", "CSS3", "JavaScript", "Flask"],
+      "status": "live",
+      "order": 4
     }
   ]
 }
