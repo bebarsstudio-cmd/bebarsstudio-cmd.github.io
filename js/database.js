@@ -1,5 +1,4 @@
 // ==================== FIREBASE CONFIGURATION ====================
-// REPLACE THIS with your Firebase config from the console
 const firebaseConfig = {
   apiKey: "AIzaSyDEanSu4udXOwgfRLqi8uZCz5SR-dT2DMo",
   authDomain: "bebars-portfolio.firebaseapp.com",
@@ -14,7 +13,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
-api
 // ==================== DATABASE SYSTEM ====================
 let isAdmin = false;
 let currentUser = null;
@@ -626,5 +624,164 @@ document.addEventListener('mousemove', (e) => {
     });
 });
 
+// ==================== VS SECTION FUNCTIONS ====================
+
+// Load likes from Firebase
+async function loadLikes() {
+    try {
+        const doc = await db.collection('vs').doc('likes').get();
+        if (doc.exists) {
+            return doc.data();
+        } else {
+            // Initialize if not exists
+            const defaultLikes = { bebars: 0, ahmed: 0 };
+            await db.collection('vs').doc('likes').set(defaultLikes);
+            return defaultLikes;
+        }
+    } catch (error) {
+        console.error("Error loading likes:", error);
+        return { bebars: 0, ahmed: 0 };
+    }
+}
+
+// Add like to a user
+async function addLike(user) {
+    if (!user || (user !== 'bebars' && user !== 'ahmed')) return;
+    
+    try {
+        // Check if user already voted today (optional: limit one vote per day)
+        const lastVote = localStorage.getItem(`vote_${user}`);
+        const today = new Date().toDateString();
+        
+        if (lastVote === today) {
+            showToast(`You already voted for ${user.toUpperCase()} today! Come back tomorrow!`, true);
+            return;
+        }
+        
+        // Update likes in Firebase
+        const vsRef = db.collection('vs').doc('likes');
+        await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(vsRef);
+            const currentLikes = doc.exists ? doc.data() : { bebars: 0, ahmed: 0 };
+            currentLikes[user] = (currentLikes[user] || 0) + 1;
+            transaction.set(vsRef, currentLikes);
+        });
+        
+        // Save vote date
+        localStorage.setItem(`vote_${user}`, today);
+        
+        // Animate the heart
+        const btn = event.currentTarget;
+        const icon = btn.querySelector('i');
+        icon.classList.add('animate');
+        setTimeout(() => icon.classList.remove('animate'), 500);
+        
+        showToast(`Thanks for supporting ${user.toUpperCase()}! 🎉`);
+        
+        // Update display
+        await displayLikes();
+        
+        // Refresh stats
+        await updateProgressStats();
+        
+    } catch (error) {
+        console.error("Error adding like:", error);
+        showToast("Error adding like. Please try again!", true);
+    }
+}
+
+// Display likes on the page
+async function displayLikes() {
+    const likes = await loadLikes();
+    
+    const bebarsCount = document.getElementById('bebarsLikes');
+    const ahmedCount = document.getElementById('ahmedLikes');
+    
+    if (bebarsCount) bebarsCount.textContent = likes.bebars || 0;
+    if (ahmedCount) ahmedCount.textContent = likes.ahmed || 0;
+    
+    await updateProgressStats(likes);
+}
+
+// Update progress bar and percentages
+async function updateProgressStats(likesData = null) {
+    const likes = likesData || await loadLikes();
+    const total = (likes.bebars || 0) + (likes.ahmed || 0);
+    
+    let bebarsPercent = 50;
+    let ahmedPercent = 50;
+    
+    if (total > 0) {
+        bebarsPercent = ((likes.bebars || 0) / total) * 100;
+        ahmedPercent = ((likes.ahmed || 0) / total) * 100;
+    }
+    
+    const progressBebars = document.getElementById('progressBebars');
+    const progressAhmed = document.getElementById('progressAhmed');
+    const bebarsPercentSpan = document.getElementById('bebarsPercent');
+    const ahmedPercentSpan = document.getElementById('ahmedPercent');
+    
+    if (progressBebars) progressBebars.style.width = `${bebarsPercent}%`;
+    if (progressAhmed) progressAhmed.style.width = `${ahmedPercent}%`;
+    if (bebarsPercentSpan) bebarsPercentSpan.textContent = Math.round(bebarsPercent);
+    if (ahmedPercentSpan) ahmedPercentSpan.textContent = Math.round(ahmedPercent);
+}
+
+// Real-time listener for VS likes
+function setupVSLiveListener() {
+    db.collection('vs').doc('likes').onSnapshot((doc) => {
+        if (doc.exists) {
+            const likes = doc.data();
+            updateProgressStats(likes);
+            
+            // Update like counts without refreshing entire page
+            const bebarsCount = document.getElementById('bebarsLikes');
+            const ahmedCount = document.getElementById('ahmedLikes');
+            if (bebarsCount) bebarsCount.textContent = likes.bebars || 0;
+            if (ahmedCount) ahmedCount.textContent = likes.ahmed || 0;
+        }
+    });
+}
+
 // Start the application
-init();
+// Update your init function
+async function init() {
+    await displayNews();
+    await displayProjects();
+    await displaySkills();
+    await displayLikes();  // Add this line
+    
+    // Setup real-time listener for VS
+    setupVSLiveListener();  // Add this line
+    
+    // News form (existing code)
+    const newsForm = document.getElementById('newsForm');
+    if (newsForm) {
+        newsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('newsTitle').value.trim();
+            const content = document.getElementById('newsContent').value.trim();
+            const category = document.getElementById('newsCategory').value;
+            if (title && content) {
+                await addNews(title, content, category);
+                document.getElementById('newsTitle').value = '';
+                document.getElementById('newsContent').value = '';
+            } else {
+                showToast("Please fill in both title and content!", true);
+            }
+        });
+    }
+    
+    // Admin button (existing code)
+    const adminButton = document.getElementById('adminButton');
+    if (adminButton) {
+        adminButton.addEventListener('click', () => {
+            if (isAdmin) {
+                const panel = document.getElementById('adminPanel');
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            } else {
+                openLoginModal();
+            }
+        });
+    }
+}

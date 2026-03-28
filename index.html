@@ -21,6 +21,7 @@
             <ul class="nav-menu">
                 <li><a href="#home" class="nav-link active">Home</a></li>
                 <li><a href="#news" class="nav-link">NEWS</a></li>
+                <li><a href="#vs" class="nav-link">VS</a></li>
                 <li><a href="#about" class="nav-link">About</a></li>
                 <li><a href="#skills" class="nav-link">Skills</a></li>
                 <li><a href="#projects" class="nav-link">Projects</a></li>
@@ -101,15 +102,65 @@
         </div>
     </section>
 
-    <!-- vs section -->
-     <section id="vs">
-        <h2 class="section-title">bebars<span>vs</span> Ahmed</h2>
-        <p>visit <a href="data/loading.html">ahmed</a></p>
-        <p>or like me</p>
-        <button>like</button>
-        <a href=""><img src="" alt="like"></a>
-        
-     </section>
+        <!-- VS Section - Bebars vs Ahmed -->
+    <section id="vs" class="vs-section">
+        <div class="container">
+            <h2 class="section-title">Bebars <span>VS</span> Ahmed</h2>
+            <p class="vs-subtitle">Who do you support? Vote for your favorite!</p>
+            
+            <div class="vs-container">
+                <!-- Bebars Card -->
+                <div class="vs-card bebars-card">
+                    <div class="vs-avatar">
+                        <img src="imgs/Bebars.png" alt="Bebars">
+                    </div>
+                    <h3>BEBARS</h3>
+                    <div class="like-counter">
+                        <span id="bebarsLikes" class="like-count">0</span>
+                        <span class="like-label">Likes</span>
+                    </div>
+                    <button class="like-btn" onclick="addLike('bebars')">
+                        <i class="fas fa-heart"></i> Support Bebars
+                    </button>
+                </div>
+                
+                <!-- VS Badge -->
+                <div class="vs-badge">
+                    <span>VS</span>
+                </div>
+                
+                <!-- Ahmed Card -->
+                <div class="vs-card ahmed-card">
+                    <div class="vs-avatar">
+                        <img src="imgs/Ahmed.jpg" alt="Ahmed">
+                    </div>
+                    <h3>AHMED</h3>
+                    <div class="like-counter">
+                        <span id="ahmedLikes" class="like-count">0</span>
+                        <span class="like-label">Likes</span>
+                    </div>
+                    <button class="like-btn" onclick="addLike('ahmed')">
+                        <i class="fas fa-heart"></i> Support Ahmed
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="vs-progress">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-bebars" id="progressBebars" style="width: 50%"></div>
+                    <div class="progress-bar-ahmed" id="progressAhmed" style="width: 50%"></div>
+                </div>
+                <div class="progress-stats">
+                    <span id="bebarsPercent">50</span>% - <span id="ahmedPercent">50</span>%
+                </div>
+            </div>
+            
+            <p class="vs-note">
+                <i class="fas fa-chart-line"></i> Real-time voting - Your vote counts!
+            </p>
+        </div>
+    </section>
 
     <!-- About Section -->
     <section id="about" class="about">
@@ -240,15 +291,18 @@
     </div>
 
 
-        <!-- ========== FIREBASE SDK ========== -->
+    <!-- ========== SCRIPTS (Load in this order) ========== -->
+    <!-- 1. Firebase SDK first -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     
-    <!-- Database Script (Firebase Version) -->
+    <!-- 2. Database script (Firebase operations) -->
     <script src="js/database.js"></script>
-    <!-- main script -->
-     <script src="js/script.js"></script>
+    
+    <!-- 3. UI Script (animations, navigation) -->
+    <script src="js/script.js"></script>
+    <!-- ================================================ -->
 </body>
 </html>
 
