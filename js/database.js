@@ -16,6 +16,7 @@ let firebaseAvailable = true;
 let db = null;
 let auth = null;
 let adminsList = [];
+let databaseReady = false;
 
 // Collections
 const COLLECTIONS = {
@@ -40,6 +41,7 @@ async function initFirebase() {
         db = firebase.firestore();
         auth = firebase.auth();
         
+        // Test connection
         await db.collection('_test').doc('test').get();
         console.log("✅ Firebase connected successfully");
         firebaseAvailable = true;
@@ -56,9 +58,9 @@ async function initFirebase() {
 
 // Load admins from JSON/Firebase
 async function loadAdmins() {
-    // Try Firebase first
-    if (firebaseAvailable && db) {
-        try {
+    try {
+        // Try Firebase first
+        if (firebaseAvailable && db) {
             const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
             const admins = [];
             snapshot.forEach(doc => {
@@ -66,11 +68,12 @@ async function loadAdmins() {
             });
             if (admins.length > 0) {
                 adminsList = admins;
+                console.log("✅ Admins loaded from Firebase");
                 return admins;
             }
-        } catch (error) {
-            console.warn("Firebase loadAdmins failed:", error);
         }
+    } catch (error) {
+        console.warn("Firebase loadAdmins failed:", error);
     }
     
     // Fallback to JSON
@@ -79,7 +82,7 @@ async function loadAdmins() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         adminsList = data.admins;
-        console.log("✅ Loaded admins from JSON");
+        console.log("✅ Admins loaded from JSON");
         return adminsList;
     } catch (error) {
         console.log("⚠️ Could not load admins.json, using default");
@@ -117,7 +120,6 @@ async function saveAdmins(admins) {
     // Try Firebase first
     if (firebaseAvailable && db) {
         try {
-            // Clear existing and save all
             const snapshot = await db.collection(COLLECTIONS.ADMINS).get();
             const batch = db.batch();
             snapshot.forEach(doc => {
@@ -125,7 +127,6 @@ async function saveAdmins(admins) {
             });
             await batch.commit();
             
-            // Save new admins
             for (const admin of admins) {
                 await db.collection(COLLECTIONS.ADMINS).add(admin);
             }
@@ -137,17 +138,15 @@ async function saveAdmins(admins) {
     
     // Always save to localStorage as backup
     localStorage.setItem('admins_backup', JSON.stringify(admins));
-    
     return true;
 }
 
 // Add new admin
 async function addAdmin(adminData) {
-    if (!isUserAdmin() || currentAdmin?.role !== 'super_admin') {
+    if (!isAdmin || currentAdmin?.role !== 'super_admin') {
         return { success: false, message: "Only super admin can add new admins!" };
     }
     
-    // Check if username or email exists
     const existing = adminsList.find(a => 
         a.username === adminData.username || a.email === adminData.email
     );
@@ -176,7 +175,7 @@ async function addAdmin(adminData) {
 
 // Update admin
 async function updateAdmin(adminId, updates) {
-    if (!isUserAdmin()) {
+    if (!isAdmin) {
         return { success: false, message: "Admin access required!" };
     }
     
@@ -185,7 +184,6 @@ async function updateAdmin(adminId, updates) {
         return { success: false, message: "Admin not found!" };
     }
     
-    // Only super admin can modify other admins
     if (currentAdmin.role !== 'super_admin' && adminsList[index].id !== currentAdmin.id) {
         return { success: false, message: "You can only edit your own profile!" };
     }
@@ -193,10 +191,10 @@ async function updateAdmin(adminId, updates) {
     adminsList[index] = { ...adminsList[index], ...updates };
     await saveAdmins(adminsList);
     
-    // Update current session if editing self
     if (adminsList[index].id === currentAdmin.id) {
         currentAdmin = adminsList[index];
         localStorage.setItem('admin_session', JSON.stringify({
+            id: currentAdmin.id,
             username: currentAdmin.username,
             displayName: currentAdmin.displayName,
             role: currentAdmin.role,
@@ -209,7 +207,7 @@ async function updateAdmin(adminId, updates) {
 
 // Delete admin
 async function deleteAdmin(adminId) {
-    if (!isUserAdmin() || currentAdmin?.role !== 'super_admin') {
+    if (!isAdmin || currentAdmin?.role !== 'super_admin') {
         return { success: false, message: "Only super admin can delete admins!" };
     }
     
@@ -260,6 +258,7 @@ async function adminLogin(usernameOrEmail, password) {
     }
     
     currentAdmin = jsonResult.admin;
+    isAdmin = true;
     
     if (firebaseAvailable && auth) {
         try {
@@ -276,13 +275,10 @@ async function adminLogin(usernameOrEmail, password) {
                 role: currentAdmin.role,
                 isAdmin: true
             }, { merge: true });
-            
         } catch (firebaseError) {
             console.warn("Firebase auth failed, using JSON only:", firebaseError);
         }
     }
-    
-    isAdmin = true;
     
     localStorage.setItem('admin_session', JSON.stringify({
         id: currentAdmin.id,
@@ -324,14 +320,18 @@ async function checkAdminSession() {
         try {
             const sessionData = JSON.parse(session);
             await loadAdmins();
-            const admin = adminsList.find(a => a.username === sessionData.username);
+            const admin = adminsList.find(a => a.id === sessionData.id || a.username === sessionData.username);
             if (admin) {
                 currentAdmin = admin;
                 isAdmin = true;
+                console.log("✅ Admin session restored:", admin.displayName);
                 return true;
+            } else {
+                localStorage.removeItem('admin_session');
             }
         } catch (error) {
             console.error("Session restore error:", error);
+            localStorage.removeItem('admin_session');
         }
     }
     return isAdmin;
@@ -339,7 +339,9 @@ async function checkAdminSession() {
 
 // Get admin list
 async function getAdminsList() {
-    await loadAdmins();
+    if (adminsList.length === 0) {
+        await loadAdmins();
+    }
     return adminsList;
 }
 
@@ -484,7 +486,7 @@ async function loadNews() {
 }
 
 async function addNews(title, content, category) {
-    if (!isUserAdmin()) {
+    if (!isAdmin) {
         return { success: false, message: "Admin access required!" };
     }
     
@@ -519,7 +521,7 @@ async function addNews(title, content, category) {
 }
 
 async function deleteNews(id) {
-    if (!isUserAdmin()) {
+    if (!isAdmin) {
         return { success: false, message: "Admin access required!" };
     }
     
@@ -543,7 +545,7 @@ async function deleteNews(id) {
 }
 
 async function editNews(id, newTitle, newContent) {
-    if (!isUserAdmin()) {
+    if (!isAdmin) {
         return { success: false, message: "Admin access required!" };
     }
     
@@ -774,11 +776,13 @@ function escapeHtml(text) {
 // ==================== INITIALIZATION ====================
 
 async function initDatabase() {
+    console.log("🔧 Initializing database...");
     await initFirebase();
     await loadAdmins();
     await checkAdminSession();
     
     if (!firebaseAvailable) {
+        console.log("⚠️ Running in OFFLINE/BACKUP mode - using local JSON files");
         const notification = document.createElement('div');
         notification.className = 'backup-notification';
         notification.innerHTML = `
@@ -790,7 +794,36 @@ async function initDatabase() {
         setTimeout(() => notification.remove(), 5000);
     }
     
+    databaseReady = true;
+    console.log("✅ Database ready");
     return firebaseAvailable;
 }
 
+// Make functions globally available
+window.adminLogin = adminLogin;
+window.adminLogout = adminLogout;
+window.addAdmin = addAdmin;
+window.updateAdmin = updateAdmin;
+window.deleteAdmin = deleteAdmin;
+window.getAdminsList = getAdminsList;
+window.getCurrentAdmin = getCurrentAdmin;
+window.isUserAdmin = isUserAdmin;
+window.getAdminStatus = getAdminStatus;
+window.loadNews = loadNews;
+window.addNews = addNews;
+window.deleteNews = deleteNews;
+window.editNews = editNews;
+window.getNewsById = getNewsById;
+window.loadProjects = loadProjects;
+window.loadSkills = loadSkills;
+window.addLikeToDatabase = addLikeToDatabase;
+window.getLikeCounts = getLikeCounts;
+window.setupVSLiveListener = setupVSLiveListener;
+window.sendFeedbackToEmail = sendFeedbackToEmail;
+window.formatDate = formatDate;
+window.getCategoryName = getCategoryName;
+window.escapeHtml = escapeHtml;
+window.initDatabase = initDatabase;
+
+// Auto-init
 document.addEventListener('DOMContentLoaded', initDatabase);

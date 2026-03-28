@@ -16,7 +16,7 @@
       "email": "ahmed@example.com",
       "password": "admin2",
       "displayName": "Ahmed",
-      "role": "admin",
+      "role": "super_admin",
       "avatar": "images/ahmed.png",
       "createdAt": "2026-03-28"
     },
@@ -26,7 +26,7 @@
         "email": "hadder@example.com",
         "password": "1122334455",
         "displayName": "Hadder",
-        "role": "admin",
+        "role": "super_admin",
         "avatar": "images/hadder.png",
         "createdAt": "2026-03-28"
     }
