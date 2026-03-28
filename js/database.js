@@ -1,18 +1,19 @@
 // ==================== FIREBASE CONFIGURATION ====================
+// REPLACE THIS with your Firebase config from the console
 const firebaseConfig = {
-  apiKey: "AIzaSyDEanSu4udXOwgfRLqi8uZCz5SR-dT2DMo",
-  authDomain: "bebars-portfolio.firebaseapp.com",
-  projectId: "bebars-portfolio",
-  storageBucket: "bebars-portfolio.firebasestorage.app",
-  messagingSenderId: "274545746997",
-  appId: "1:274545746997:web:52d76f1748b3be6c403d7c",
-  measurementId: "G-Q1QEPX1P0L"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
 };
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+
 // ==================== DATABASE SYSTEM ====================
 let isAdmin = false;
 let currentUser = null;
@@ -22,7 +23,8 @@ const COLLECTIONS = {
     NEWS: 'news',
     PROJECTS: 'projects',
     SKILLS: 'skills',
-    USERS: 'users'
+    USERS: 'users',
+    VS: 'vs'
 };
 
 // ==================== AUTHENTICATION ====================
@@ -39,19 +41,13 @@ async function adminLogin(email, password) {
             await auth.signOut();
             isAdmin = false;
             currentUser = null;
-            showToast("You don't have admin privileges!", true);
-            return false;
+            return { success: false, message: "You don't have admin privileges!" };
         }
         
         isAdmin = true;
-        showToast("Welcome back, Admin!");
-        document.getElementById('adminPanel').style.display = 'block';
-        document.getElementById('adminButton').innerHTML = '<div class="admin-btn" style="background: #4caf50;"><i class="fas fa-check"></i></div>';
-        displayNews(); // Refresh to show admin buttons
-        return true;
+        return { success: true, message: "Welcome back, Admin!" };
     } catch (error) {
-        showToast(error.message, true);
-        return false;
+        return { success: false, message: error.message };
     }
 }
 
@@ -61,39 +57,23 @@ async function adminLogout() {
         await auth.signOut();
         isAdmin = false;
         currentUser = null;
-        document.getElementById('adminPanel').style.display = 'none';
-        document.getElementById('adminButton').innerHTML = '<div class="admin-btn"><i class="fas fa-lock"></i></div>';
-        displayNews(); // Refresh to remove admin buttons
-        showToast("Logged out successfully!");
+        return { success: true, message: "Logged out successfully!" };
     } catch (error) {
-        showToast(error.message, true);
+        return { success: false, message: error.message };
     }
 }
 
-// Check auth state
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        currentUser = user;
-        try {
-            const userDoc = await db.collection(COLLECTIONS.USERS).doc(user.uid).get();
-            if (userDoc.exists && userDoc.data().isAdmin) {
-                isAdmin = true;
-                document.getElementById('adminPanel').style.display = 'block';
-                document.getElementById('adminButton').innerHTML = '<div class="admin-btn" style="background: #4caf50;"><i class="fas fa-check"></i></div>';
-                displayNews(); // Refresh to show admin buttons
-            } else {
-                await auth.signOut();
-            }
-        } catch (error) {
-            console.error("Auth error:", error);
-        }
-    } else {
-        isAdmin = false;
-        currentUser = null;
-    }
-});
+// Check if user is admin
+function isUserAdmin() {
+    return isAdmin;
+}
 
-// ==================== DATA OPERATIONS ====================
+// Get current admin status for UI
+function getAdminStatus() {
+    return { isAdmin: isAdmin, user: currentUser };
+}
+
+// ==================== NEWS OPERATIONS ====================
 
 // Load news from Firestore
 async function loadNews() {
@@ -110,10 +90,83 @@ async function loadNews() {
         return news;
     } catch (error) {
         console.error("Error loading news:", error);
-        showToast("Error loading news", true);
         return [];
     }
 }
+
+// Add new news
+async function addNews(title, content, category) {
+    if (!isAdmin) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    try {
+        const newNews = {
+            title: title,
+            content: content,
+            date: new Date().toISOString().split('T')[0],
+            category: category,
+            author: "BEBARS",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection(COLLECTIONS.NEWS).add(newNews);
+        return { success: true, message: "News published successfully!" };
+    } catch (error) {
+        console.error("Error adding news:", error);
+        return { success: false, message: "Error publishing news" };
+    }
+}
+
+// Delete news
+async function deleteNews(id) {
+    if (!isAdmin) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    try {
+        await db.collection(COLLECTIONS.NEWS).doc(id).delete();
+        return { success: true, message: "News deleted successfully!" };
+    } catch (error) {
+        console.error("Error deleting news:", error);
+        return { success: false, message: "Error deleting news" };
+    }
+}
+
+// Edit news
+async function editNews(id, newTitle, newContent) {
+    if (!isAdmin) {
+        return { success: false, message: "Admin access required!" };
+    }
+    
+    try {
+        await db.collection(COLLECTIONS.NEWS).doc(id).update({
+            title: newTitle,
+            content: newContent,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return { success: true, message: "News updated successfully!" };
+    } catch (error) {
+        console.error("Error updating news:", error);
+        return { success: false, message: "Error updating news" };
+    }
+}
+
+// Get single news item
+async function getNewsById(id) {
+    try {
+        const doc = await db.collection(COLLECTIONS.NEWS).doc(id).get();
+        if (doc.exists) {
+            return { id: doc.id, ...doc.data() };
+        }
+        return null;
+    } catch (error) {
+        console.error("Error getting news:", error);
+        return null;
+    }
+}
+
+// ==================== PROJECTS OPERATIONS ====================
 
 // Load projects from Firestore
 async function loadProjects() {
@@ -130,10 +183,11 @@ async function loadProjects() {
         return projects;
     } catch (error) {
         console.error("Error loading projects:", error);
-        showToast("Error loading projects", true);
         return [];
     }
 }
+
+// ==================== SKILLS OPERATIONS ====================
 
 // Load skills from Firestore
 async function loadSkills() {
@@ -197,213 +251,129 @@ async function loadSkills() {
     }
 }
 
-// Add new news
-async function addNews(title, content, category) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
+// ==================== VS SECTION OPERATIONS ====================
+
+// Load likes from Firebase
+async function loadLikes() {
+    try {
+        const doc = await db.collection(COLLECTIONS.VS).doc('likes').get();
+        if (doc.exists) {
+            return doc.data();
+        } else {
+            const defaultLikes = { bebars: 0, ahmed: 0 };
+            await db.collection(COLLECTIONS.VS).doc('likes').set(defaultLikes);
+            return defaultLikes;
+        }
+    } catch (error) {
+        console.error("Error loading likes:", error);
+        return { bebars: 0, ahmed: 0 };
+    }
+}
+
+// Add like to a user
+async function addLikeToDatabase(user) {
+    if (!user || (user !== 'bebars' && user !== 'ahmed')) {
+        return { success: false, message: "Invalid user" };
     }
     
     try {
-        const newNews = {
-            title: title,
-            content: content,
-            date: new Date().toISOString().split('T')[0],
-            category: category,
-            author: "BEBARS",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // Check if user already voted today
+        const lastVote = localStorage.getItem(`vote_${user}`);
+        const today = new Date().toDateString();
+        
+        if (lastVote === today) {
+            return { success: false, message: `You already voted for ${user.toUpperCase()} today! Come back tomorrow!` };
+        }
+        
+        const vsRef = db.collection(COLLECTIONS.VS).doc('likes');
+        await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(vsRef);
+            const currentLikes = doc.exists ? doc.data() : { bebars: 0, ahmed: 0 };
+            currentLikes[user] = (currentLikes[user] || 0) + 1;
+            transaction.set(vsRef, currentLikes);
+        });
+        
+        // Save vote date
+        localStorage.setItem(`vote_${user}`, today);
+        return { success: true, message: `Thanks for supporting ${user.toUpperCase()}! 🎉` };
+        
+    } catch (error) {
+        console.error("Error adding like:", error);
+        return { success: false, message: "Error adding like. Please try again!" };
+    }
+}
+
+// Get current like counts
+async function getLikeCounts() {
+    return await loadLikes();
+}
+
+// Setup real-time listener for VS likes
+function setupVSLiveListener(callback) {
+    return db.collection(COLLECTIONS.VS).doc('likes').onSnapshot((doc) => {
+        if (doc.exists && callback) {
+            callback(doc.data());
+        }
+    });
+}
+
+// ==================== FEEDBACK OPERATIONS ====================
+
+// Send feedback to email via EmailJS
+async function sendFeedbackToEmail(feedbackData) {
+    try {
+        // EmailJS configuration - Replace with your actual keys
+        // Sign up at https://www.emailjs.com/ to get these
+        const EMAILJS_CONFIG = {
+            publicKey: "YOUR_EMAILJS_PUBLIC_KEY",
+            serviceId: "YOUR_EMAILJS_SERVICE_ID",
+            templateId: "YOUR_EMAILJS_TEMPLATE_ID"
         };
         
-        await db.collection(COLLECTIONS.NEWS).add(newNews);
-        showToast("News published successfully!");
-        displayNews();
-    } catch (error) {
-        console.error("Error adding news:", error);
-        showToast("Error publishing news", true);
-    }
-}
-
-// Delete news
-async function deleteNews(id) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
-    }
-    
-    if (confirm("Are you sure you want to delete this news?")) {
-        try {
-            await db.collection(COLLECTIONS.NEWS).doc(id).delete();
-            showToast("News deleted successfully!");
-            displayNews();
-        } catch (error) {
-            console.error("Error deleting news:", error);
-            showToast("Error deleting news", true);
+        // Initialize EmailJS if not already done
+        if (typeof emailjs !== 'undefined' && !window.emailjsInitialized) {
+            emailjs.init(EMAILJS_CONFIG.publicKey);
+            window.emailjsInitialized = true;
         }
-    }
-}
-
-// Edit news
-async function editNews(id) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
-    }
-    
-    const doc = await db.collection(COLLECTIONS.NEWS).doc(id).get();
-    if (doc.exists) {
-        const item = doc.data();
-        const newTitle = prompt("Edit title:", item.title);
-        if (newTitle !== null && newTitle.trim()) {
-            const newContent = prompt("Edit content:", item.content);
-            if (newContent !== null && newContent.trim()) {
-                try {
-                    await db.collection(COLLECTIONS.NEWS).doc(id).update({
-                        title: newTitle,
-                        content: newContent,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast("News updated successfully!");
-                    displayNews();
-                } catch (error) {
-                    console.error("Error updating news:", error);
-                    showToast("Error updating news", true);
-                }
-            }
-        }
-    }
-}
-
-// ==================== DISPLAY FUNCTIONS ====================
-
-// Display news
-async function displayNews() {
-    const newsGrid = document.getElementById('newsGrid');
-    const news = await loadNews();
-    
-    if (!news || news.length === 0) {
-        newsGrid.innerHTML = '<div class="empty-news"><i class="fas fa-newspaper"></i><p>No news yet. Check back soon!</p></div>';
-        return;
-    }
-    
-    newsGrid.innerHTML = news.map(item => `
-        <div class="news-card" data-id="${item.id}">
-            <div class="news-badge ${item.category || 'general'}">${getCategoryName(item.category)}</div>
-            <div class="news-date"><i class="far fa-calendar-alt"></i> ${formatDate(item.date)}</div>
-            <h3 class="news-title">${escapeHtml(item.title)}</h3>
-            <p class="news-content">${escapeHtml(item.content)}</p>
-            ${item.author ? `<div class="news-author"><i class="fas fa-user"></i> ${escapeHtml(item.author)}</div>` : ''}
-            ${isAdmin ? `
-                <div class="news-actions">
-                    <button class="btn-danger" onclick="deleteNews('${item.id}')"><i class="fas fa-trash"></i> Delete</button>
-                    <button class="btn-warning" onclick="editNews('${item.id}')"><i class="fas fa-edit"></i> Edit</button>
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
-
-// Display projects
-async function displayProjects() {
-    const projectsGrid = document.getElementById('projectsGrid');
-    const projects = await loadProjects();
-    
-    if (!projects || projects.length === 0) {
-        projectsGrid.innerHTML = '<div class="empty-news"><i class="fas fa-folder-open"></i><p>No projects yet. Coming soon!</p></div>';
-        return;
-    }
-    
-    projectsGrid.innerHTML = projects.map(project => `
-        <div class="project-card">
-            <div class="project-image">
-                <img src="${project.image || 'images/soon.png'}" alt="${escapeHtml(project.title)}" onerror="this.src='images/soon.png'">
-                <div class="project-overlay">
-                    <a href="${project.github}" target="_blank"><i class="fab fa-github"></i></a>
-                    <a href="${project.live}" target="_blank"><i class="fas fa-external-link-alt"></i></a>
-                </div>
-            </div>
-            <div class="project-info">
-                <h3>${escapeHtml(project.title)}</h3>
-                <p>${escapeHtml(project.description)}</p>
-                <div class="project-tech">
-                    ${project.tech.map(tech => `<span>${escapeHtml(tech)}</span>`).join('')}
-                </div>
-                ${project.status ? `<div class="project-status status-${project.status}">${project.status.toUpperCase()}</div>` : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-// Display skills
-async function displaySkills() {
-    const skillsGrid = document.getElementById('skillsGrid');
-    const aboutStats = document.getElementById('aboutStats');
-    const data = await loadSkills();
-    
-    if (!data.skills || data.skills.length === 0) {
-        skillsGrid.innerHTML = '<div class="empty-news"><i class="fas fa-chart-line"></i><p>Skills data not available.</p></div>';
-        return;
-    }
-    
-    skillsGrid.innerHTML = data.skills.map(category => `
-        <div class="skill-category">
-            <h3><i class="fas ${category.icon}"></i> ${category.category}</h3>
-            <div class="skill-items">
-                ${category.skills.map(skill => `
-                    <div class="skill-item">
-                        <span>${escapeHtml(skill.name)}</span>
-                        <div class="progress-bar">
-                            <div class="progress" data-width="${skill.level}"></div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `).join('');
-    
-    if (aboutStats && data.stats) {
-        aboutStats.innerHTML = data.stats.map(stat => `
-            <div class="stat-item">
-                <div class="stat-circle">
-                    <svg viewBox="0 0 100 100">
-                        <defs>
-                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#667eea"/>
-                                <stop offset="100%" stop-color="#764ba2"/>
-                            </linearGradient>
-                        </defs>
-                        <circle cx="50" cy="50" r="45"></circle>
-                        <circle cx="50" cy="50" r="45" style="stroke: url(#gradient);"></circle>
-                    </svg>
-                    <span>${stat.value}%</span>
-                </div>
-                <p>${escapeHtml(stat.name)}</p>
-            </div>
-        `).join('');
         
-        // Animate circles
-        setTimeout(() => {
-            const circles = document.querySelectorAll('.stat-circle circle:last-child');
-            circles.forEach(circle => {
-                const percent = parseInt(circle.parentElement.querySelector('span').textContent);
-                const circumference = 2 * Math.PI * 45;
-                const dashOffset = circumference - (percent / 100) * circumference;
-                circle.style.strokeDasharray = circumference;
-                circle.style.strokeDashoffset = dashOffset;
-            });
-        }, 100);
+        const templateParams = {
+            from_name: feedbackData.name,
+            from_email: feedbackData.email,
+            feedback_type: feedbackData.type,
+            subject: feedbackData.subject,
+            message: feedbackData.message,
+            page_url: feedbackData.page_url || '',
+            to_email: "bebarsstudio@gmail.com",
+            timestamp: new Date().toLocaleString()
+        };
+        
+        const response = await emailjs.send(
+            EMAILJS_CONFIG.serviceId,
+            EMAILJS_CONFIG.templateId,
+            templateParams
+        );
+        
+        if (response.status === 200) {
+            return { success: true, message: "Feedback sent successfully! I'll get back to you soon." };
+        } else {
+            throw new Error("Failed to send");
+        }
+        
+    } catch (error) {
+        console.error("Error sending feedback:", error);
+        return { success: false, message: "Failed to send. Please email directly: bebarsstudio@gmail.com" };
     }
-    
-    // Animate progress bars
-    setTimeout(() => {
-        const progressBars = document.querySelectorAll('.progress');
-        progressBars.forEach(bar => {
-            const width = bar.getAttribute('data-width');
-            bar.style.width = `${width}%`;
-        });
-    }, 100);
 }
 
-// Helper functions
+// ==================== HELPER FUNCTIONS ====================
+
+// Format date for display
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Get category display name
 function getCategoryName(category) {
     const categories = {
         'announcement': '📢 ANNOUNCEMENT',
@@ -414,374 +384,9 @@ function getCategoryName(category) {
     return categories[category] || '📰 NEWS';
 }
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
+// Escape HTML to prevent XSS
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-function showToast(message, isError = false) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.style.background = isError ? 'var(--danger)' : 'var(--gradient)';
-    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i> ${message}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// ==================== LOGIN MODAL ====================
-
-function openLoginModal() {
-    const modal = document.getElementById('loginModal');
-    modal.classList.add('active');
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h2><i class="fas fa-shield-alt"></i> Admin Login</h2>
-            <input type="email" id="adminEmail" placeholder="Email" autocomplete="email">
-            <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password">
-            <button class="btn-primary" onclick="handleLogin()">Login</button>
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-        </div>
-    `;
-}
-
-async function handleLogin() {
-    const email = document.getElementById('adminEmail').value;
-    const password = document.getElementById('adminPassword').value;
-    const success = await adminLogin(email, password);
-    if (success) {
-        closeModal();
-    }
-}
-
-function closeModal() {
-    const modal = document.getElementById('loginModal');
-    modal.classList.remove('active');
-}
-
-// ==================== INITIALIZATION ====================
-
-async function init() {
-    await displayNews();
-    await displayProjects();
-    await displaySkills();
-    
-    // News form
-    const newsForm = document.getElementById('newsForm');
-    if (newsForm) {
-        newsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('newsTitle').value.trim();
-            const content = document.getElementById('newsContent').value.trim();
-            const category = document.getElementById('newsCategory').value;
-            if (title && content) {
-                await addNews(title, content, category);
-                document.getElementById('newsTitle').value = '';
-                document.getElementById('newsContent').value = '';
-            } else {
-                showToast("Please fill in both title and content!", true);
-            }
-        });
-    }
-    
-    // Admin button
-    const adminButton = document.getElementById('adminButton');
-    if (adminButton) {
-        adminButton.addEventListener('click', () => {
-            if (isAdmin) {
-                const panel = document.getElementById('adminPanel');
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            } else {
-                openLoginModal();
-            }
-        });
-    }
-}
-
-// ==================== UI INTERACTIONS ====================
-
-// Navigation
-const hamburger = document.querySelector('.hamburger');
-const navMenu = document.querySelector('.nav-menu');
-const navLinks = document.querySelectorAll('.nav-link');
-
-if (hamburger) {
-    hamburger.addEventListener('click', () => {
-        hamburger.classList.toggle('active');
-        navMenu.classList.toggle('active');
-    });
-}
-
-navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-        if (hamburger) hamburger.classList.remove('active');
-        if (navMenu) navMenu.classList.remove('active');
-    });
-});
-
-// Active link on scroll
-window.addEventListener('scroll', () => {
-    let current = '';
-    const sections = document.querySelectorAll('section');
-    sections.forEach(section => {
-        if (window.scrollY >= section.offsetTop - 200) {
-            current = section.getAttribute('id');
-        }
-    });
-    navLinks.forEach(link => {
-        link.classList.remove('active');
-        if (link.getAttribute('href').substring(1) === current) {
-            link.classList.add('active');
-        }
-    });
-});
-
-// Typing Animation
-const typedText = document.querySelector('.typed-text');
-const texts = ['Game Developer', 'Web Developer', 'Python Enthusiast', 'Open Source Contributor'];
-let textIndex = 0, charIndex = 0, isDeleting = false;
-
-function type() {
-    if (!typedText) return;
-    const currentText = texts[textIndex];
-    typedText.textContent = isDeleting ? currentText.substring(0, charIndex - 1) : currentText.substring(0, charIndex + 1);
-    charIndex += isDeleting ? -1 : 1;
-    
-    if (!isDeleting && charIndex === currentText.length) {
-        isDeleting = true;
-        setTimeout(type, 2000);
-    } else if (isDeleting && charIndex === 0) {
-        isDeleting = false;
-        textIndex = (textIndex + 1) % texts.length;
-        setTimeout(type, 500);
-    } else {
-        setTimeout(type, isDeleting ? 50 : 100);
-    }
-}
-type();
-
-// Smooth Scroll
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function(e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) target.scrollIntoView({ behavior: 'smooth' });
-    });
-});
-
-// Navbar background
-window.addEventListener('scroll', () => {
-    const navbar = document.querySelector('.navbar');
-    if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 50);
-});
-
-// Contact form
-const contactForm = document.getElementById('contactForm');
-const formMessage = document.getElementById('formMessage');
-if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        formMessage.innerHTML = '<p style="color: #667eea;"><i class="fas fa-spinner fa-spin"></i> Sending...</p>';
-        setTimeout(() => {
-            formMessage.innerHTML = '<p style="color: #4caf50;"><i class="fas fa-check-circle"></i> Message sent!</p>';
-            contactForm.reset();
-            setTimeout(() => formMessage.innerHTML = '', 3000);
-        }, 1000);
-    });
-}
-
-// Reveal animations
-const revealElements = document.querySelectorAll('.project-card, .skill-category, .about-text, .about-stats, .news-card');
-const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
-            revealObserver.unobserve(entry.target);
-        }
-    });
-}, { threshold: 0.1 });
-
-revealElements.forEach(el => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(30px)';
-    el.style.transition = 'all 0.6s ease';
-    revealObserver.observe(el);
-});
-
-// Mouse parallax
-document.addEventListener('mousemove', (e) => {
-    const shapes = document.querySelectorAll('.shape');
-    const x = e.clientX / window.innerWidth;
-    const y = e.clientY / window.innerHeight;
-    shapes.forEach((shape, i) => {
-        shape.style.transform = `translate(${x * (i + 1) * 20}px, ${y * (i + 1) * 20}px)`;
-    });
-});
-
-// ==================== VS SECTION FUNCTIONS ====================
-
-// Load likes from Firebase
-async function loadLikes() {
-    try {
-        const doc = await db.collection('vs').doc('likes').get();
-        if (doc.exists) {
-            return doc.data();
-        } else {
-            // Initialize if not exists
-            const defaultLikes = { bebars: 0, ahmed: 0 };
-            await db.collection('vs').doc('likes').set(defaultLikes);
-            return defaultLikes;
-        }
-    } catch (error) {
-        console.error("Error loading likes:", error);
-        return { bebars: 0, ahmed: 0 };
-    }
-}
-
-// Add like to a user
-async function addLike(user) {
-    if (!user || (user !== 'bebars' && user !== 'ahmed')) return;
-    
-    try {
-        // Check if user already voted today (optional: limit one vote per day)
-        const lastVote = localStorage.getItem(`vote_${user}`);
-        const today = new Date().toDateString();
-        
-        if (lastVote === today) {
-            showToast(`You already voted for ${user.toUpperCase()} today! Come back tomorrow!`, true);
-            return;
-        }
-        
-        // Update likes in Firebase
-        const vsRef = db.collection('vs').doc('likes');
-        await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(vsRef);
-            const currentLikes = doc.exists ? doc.data() : { bebars: 0, ahmed: 0 };
-            currentLikes[user] = (currentLikes[user] || 0) + 1;
-            transaction.set(vsRef, currentLikes);
-        });
-        
-        // Save vote date
-        localStorage.setItem(`vote_${user}`, today);
-        
-        // Animate the heart
-        const btn = event.currentTarget;
-        const icon = btn.querySelector('i');
-        icon.classList.add('animate');
-        setTimeout(() => icon.classList.remove('animate'), 500);
-        
-        showToast(`Thanks for supporting ${user.toUpperCase()}! 🎉`);
-        
-        // Update display
-        await displayLikes();
-        
-        // Refresh stats
-        await updateProgressStats();
-        
-    } catch (error) {
-        console.error("Error adding like:", error);
-        showToast("Error adding like. Please try again!", true);
-    }
-}
-
-// Display likes on the page
-async function displayLikes() {
-    const likes = await loadLikes();
-    
-    const bebarsCount = document.getElementById('bebarsLikes');
-    const ahmedCount = document.getElementById('ahmedLikes');
-    
-    if (bebarsCount) bebarsCount.textContent = likes.bebars || 0;
-    if (ahmedCount) ahmedCount.textContent = likes.ahmed || 0;
-    
-    await updateProgressStats(likes);
-}
-
-// Update progress bar and percentages
-async function updateProgressStats(likesData = null) {
-    const likes = likesData || await loadLikes();
-    const total = (likes.bebars || 0) + (likes.ahmed || 0);
-    
-    let bebarsPercent = 50;
-    let ahmedPercent = 50;
-    
-    if (total > 0) {
-        bebarsPercent = ((likes.bebars || 0) / total) * 100;
-        ahmedPercent = ((likes.ahmed || 0) / total) * 100;
-    }
-    
-    const progressBebars = document.getElementById('progressBebars');
-    const progressAhmed = document.getElementById('progressAhmed');
-    const bebarsPercentSpan = document.getElementById('bebarsPercent');
-    const ahmedPercentSpan = document.getElementById('ahmedPercent');
-    
-    if (progressBebars) progressBebars.style.width = `${bebarsPercent}%`;
-    if (progressAhmed) progressAhmed.style.width = `${ahmedPercent}%`;
-    if (bebarsPercentSpan) bebarsPercentSpan.textContent = Math.round(bebarsPercent);
-    if (ahmedPercentSpan) ahmedPercentSpan.textContent = Math.round(ahmedPercent);
-}
-
-// Real-time listener for VS likes
-function setupVSLiveListener() {
-    db.collection('vs').doc('likes').onSnapshot((doc) => {
-        if (doc.exists) {
-            const likes = doc.data();
-            updateProgressStats(likes);
-            
-            // Update like counts without refreshing entire page
-            const bebarsCount = document.getElementById('bebarsLikes');
-            const ahmedCount = document.getElementById('ahmedLikes');
-            if (bebarsCount) bebarsCount.textContent = likes.bebars || 0;
-            if (ahmedCount) ahmedCount.textContent = likes.ahmed || 0;
-        }
-    });
-}
-
-// Start the application
-// Update your init function
-async function init() {
-    await displayNews();
-    await displayProjects();
-    await displaySkills();
-    await displayLikes();  // Add this line
-    
-    // Setup real-time listener for VS
-    setupVSLiveListener();  // Add this line
-    
-    // News form (existing code)
-    const newsForm = document.getElementById('newsForm');
-    if (newsForm) {
-        newsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('newsTitle').value.trim();
-            const content = document.getElementById('newsContent').value.trim();
-            const category = document.getElementById('newsCategory').value;
-            if (title && content) {
-                await addNews(title, content, category);
-                document.getElementById('newsTitle').value = '';
-                document.getElementById('newsContent').value = '';
-            } else {
-                showToast("Please fill in both title and content!", true);
-            }
-        });
-    }
-    
-    // Admin button (existing code)
-    const adminButton = document.getElementById('adminButton');
-    if (adminButton) {
-        adminButton.addEventListener('click', () => {
-            if (isAdmin) {
-                const panel = document.getElementById('adminPanel');
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            } else {
-                openLoginModal();
-            }
-        });
-    }
 }

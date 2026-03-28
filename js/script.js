@@ -1,285 +1,331 @@
-// ==================== FIREBASE CONFIGURATION ====================
-// REPLACE THIS with your Firebase config from the console
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+// ==================== UI INTERACTIONS ====================
+// This file handles ONLY animations, navigation, and UI updates
+// All database operations are in database.js
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const auth = firebase.auth();
+// ==================== DOM ELEMENTS ====================
+const hamburger = document.querySelector('.hamburger');
+const navMenu = document.querySelector('.nav-menu');
+const navLinks = document.querySelectorAll('.nav-link');
+const typedText = document.querySelector('.typed-text');
+const contactForm = document.getElementById('contactForm');
+const formMessage = document.getElementById('formMessage');
+const feedbackForm = document.getElementById('feedbackForm');
+const newsForm = document.getElementById('newsForm');
+const adminButton = document.getElementById('adminButton');
+const loginModal = document.getElementById('loginModal');
 
-// ==================== DATABASE SYSTEM ====================
-let isAdmin = false;
-let currentUser = null;
+// ==================== NAVIGATION ====================
 
-// Collections
-const COLLECTIONS = {
-    NEWS: 'news',
-    PROJECTS: 'projects',
-    SKILLS: 'skills',
-    USERS: 'users'
-};
-
-// ==================== AUTHENTICATION ====================
-
-// Admin login with Firebase Auth
-async function adminLogin(email, password) {
-    try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        currentUser = userCredential.user;
-        
-        // Check if user is admin
-        const userDoc = await db.collection(COLLECTIONS.USERS).doc(currentUser.uid).get();
-        if (!userDoc.exists || !userDoc.data().isAdmin) {
-            await auth.signOut();
-            isAdmin = false;
-            currentUser = null;
-            showToast("You don't have admin privileges!", true);
-            return false;
-        }
-        
-        isAdmin = true;
-        showToast("Welcome back, Admin!");
-        document.getElementById('adminPanel').style.display = 'block';
-        document.getElementById('adminButton').innerHTML = '<div class="admin-btn" style="background: #4caf50;"><i class="fas fa-check"></i></div>';
-        displayNews(); // Refresh to show admin buttons
-        return true;
-    } catch (error) {
-        showToast(error.message, true);
-        return false;
-    }
+// Mobile menu toggle
+if (hamburger) {
+    hamburger.addEventListener('click', () => {
+        hamburger.classList.toggle('active');
+        navMenu.classList.toggle('active');
+    });
 }
 
-// Admin logout
-async function adminLogout() {
-    try {
-        await auth.signOut();
-        isAdmin = false;
-        currentUser = null;
-        document.getElementById('adminPanel').style.display = 'none';
-        document.getElementById('adminButton').innerHTML = '<div class="admin-btn"><i class="fas fa-lock"></i></div>';
-        displayNews(); // Refresh to remove admin buttons
-        showToast("Logged out successfully!");
-    } catch (error) {
-        showToast(error.message, true);
-    }
-}
+// Close mobile menu on link click
+navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+        if (hamburger) hamburger.classList.remove('active');
+        if (navMenu) navMenu.classList.remove('active');
+    });
+});
 
-// Check auth state
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        currentUser = user;
-        try {
-            const userDoc = await db.collection(COLLECTIONS.USERS).doc(user.uid).get();
-            if (userDoc.exists && userDoc.data().isAdmin) {
-                isAdmin = true;
-                document.getElementById('adminPanel').style.display = 'block';
-                document.getElementById('adminButton').innerHTML = '<div class="admin-btn" style="background: #4caf50;"><i class="fas fa-check"></i></div>';
-                displayNews(); // Refresh to show admin buttons
-            } else {
-                await auth.signOut();
-            }
-        } catch (error) {
-            console.error("Auth error:", error);
+// Active link on scroll
+window.addEventListener('scroll', () => {
+    let current = '';
+    const sections = document.querySelectorAll('section');
+    
+    sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (window.scrollY >= sectionTop - 200) {
+            current = section.getAttribute('id');
         }
-    } else {
-        isAdmin = false;
-        currentUser = null;
+    });
+    
+    navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href').substring(1) === current) {
+            link.classList.add('active');
+        }
+    });
+});
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+
+// Navbar background on scroll
+window.addEventListener('scroll', () => {
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        navbar.classList.toggle('scrolled', window.scrollY > 50);
     }
 });
 
-// ==================== DATA OPERATIONS ====================
+// ==================== TYPING ANIMATION ====================
 
-// Load news from Firestore
-async function loadNews() {
-    try {
-        const snapshot = await db.collection(COLLECTIONS.NEWS)
-            .orderBy('date', 'desc')
-            .get();
-        
-        const news = [];
-        snapshot.forEach(doc => {
-            news.push({ id: doc.id, ...doc.data() });
-        });
-        
-        return news;
-    } catch (error) {
-        console.error("Error loading news:", error);
-        showToast("Error loading news", true);
-        return [];
+const texts = ['Game Developer', 'Web Developer', 'Python Enthusiast', 'Open Source Contributor'];
+let textIndex = 0, charIndex = 0, isDeleting = false;
+
+function type() {
+    if (!typedText) return;
+    
+    const currentText = texts[textIndex];
+    typedText.textContent = isDeleting 
+        ? currentText.substring(0, charIndex - 1) 
+        : currentText.substring(0, charIndex + 1);
+    
+    charIndex += isDeleting ? -1 : 1;
+    
+    if (!isDeleting && charIndex === currentText.length) {
+        isDeleting = true;
+        setTimeout(type, 2000);
+    } else if (isDeleting && charIndex === 0) {
+        isDeleting = false;
+        textIndex = (textIndex + 1) % texts.length;
+        setTimeout(type, 500);
+    } else {
+        setTimeout(type, isDeleting ? 50 : 100);
     }
 }
 
-// Load projects from Firestore
-async function loadProjects() {
-    try {
-        const snapshot = await db.collection(COLLECTIONS.PROJECTS)
-            .orderBy('order', 'asc')
-            .get();
+type();
+
+// ==================== PROGRESS BARS ANIMATION ====================
+
+const progressObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const width = entry.target.getAttribute('data-width');
+            entry.target.style.width = `${width}%`;
+            progressObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.5 });
+
+document.querySelectorAll('.progress').forEach(bar => progressObserver.observe(bar));
+
+// ==================== CIRCLE PROGRESS ANIMATION ====================
+
+const circleObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const circles = document.querySelectorAll('.stat-circle circle:last-child');
+            circles.forEach(circle => {
+                const percent = parseInt(circle.parentElement.querySelector('span').textContent);
+                const circumference = 2 * Math.PI * 45;
+                const dashOffset = circumference - (percent / 100) * circumference;
+                circle.style.strokeDasharray = circumference;
+                circle.style.strokeDashoffset = dashOffset;
+            });
+            circleObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.5 });
+
+const statsContainer = document.querySelector('.about-stats');
+if (statsContainer) circleObserver.observe(statsContainer);
+
+// ==================== REVEAL ANIMATION ON SCROLL ====================
+
+const revealElements = document.querySelectorAll('.project-card, .skill-category, .about-text, .about-stats, .news-card');
+
+const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.style.opacity = '1';
+            entry.target.style.transform = 'translateY(0)';
+            revealObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.1 });
+
+revealElements.forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(30px)';
+    el.style.transition = 'all 0.6s ease';
+    revealObserver.observe(el);
+});
+
+// ==================== MOUSE PARALLAX EFFECT ====================
+
+document.addEventListener('mousemove', (e) => {
+    const shapes = document.querySelectorAll('.shape');
+    const x = e.clientX / window.innerWidth;
+    const y = e.clientY / window.innerHeight;
+    
+    shapes.forEach((shape, i) => {
+        const speed = (i + 1) * 20;
+        shape.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+    });
+});
+
+// ==================== CONTACT FORM ====================
+
+if (contactForm) {
+    contactForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        formMessage.innerHTML = '<p style="color: #667eea;"><i class="fas fa-spinner fa-spin"></i> Sending...</p>';
         
-        const projects = [];
-        snapshot.forEach(doc => {
-            projects.push({ id: doc.id, ...doc.data() });
-        });
-        
-        return projects;
-    } catch (error) {
-        console.error("Error loading projects:", error);
-        showToast("Error loading projects", true);
-        return [];
-    }
+        setTimeout(() => {
+            formMessage.innerHTML = '<p style="color: #4caf50;"><i class="fas fa-check-circle"></i> Message sent successfully!</p>';
+            contactForm.reset();
+            setTimeout(() => formMessage.innerHTML = '', 3000);
+        }, 1000);
+    });
 }
 
-// Load skills from Firestore
-async function loadSkills() {
-    try {
-        const doc = await db.collection(COLLECTIONS.SKILLS).doc('main').get();
-        if (doc.exists) {
-            return doc.data();
+// ==================== FEEDBACK FORM ====================
+
+if (feedbackForm) {
+    feedbackForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const name = document.getElementById('feedbackName')?.value.trim();
+        const email = document.getElementById('feedbackEmail')?.value.trim();
+        const type = document.getElementById('feedbackType')?.value;
+        const subject = document.getElementById('feedbackSubject')?.value.trim();
+        const message = document.getElementById('feedbackMessage')?.value.trim();
+        const attachUrl = document.getElementById('feedbackAttachUrl')?.checked;
+        const pageUrl = attachUrl ? window.location.href : '';
+        
+        // Validate
+        if (!name || !email || !type || !subject || !message) {
+            showFeedbackMessage('Please fill in all fields!', 'error');
+            return;
+        }
+        
+        if (!isValidEmail(email)) {
+            showFeedbackMessage('Please enter a valid email address!', 'error');
+            return;
+        }
+        
+        // Disable button
+        const submitBtn = document.getElementById('feedbackSubmitBtn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        submitBtn.disabled = true;
+        
+        // Send feedback using database.js function
+        const result = await sendFeedbackToEmail({
+            name, email, type, subject, message, page_url: pageUrl
+        });
+        
+        if (result.success) {
+            showFeedbackMessage(result.message, 'success');
+            feedbackForm.reset();
         } else {
-            // Create default skills if not exists
-            const defaultSkills = {
-                skills: [
-                    {
-                        category: "Frontend",
-                        icon: "fa-code",
-                        skills: [
-                            { name: "HTML5/CSS3", level: 100 },
-                            { name: "JavaScript", level: 34 },
-                            { name: "React.js", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Backend",
-                        icon: "fa-server",
-                        skills: [
-                            { name: "Python/Flask", level: 4 },
-                            { name: "SQLite/PostgreSQL", level: 0 },
-                            { name: "Node.js", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Game Dev",
-                        icon: "fa-gamepad",
-                        skills: [
-                            { name: "Unity/C++ (learning)", level: 0 },
-                            { name: "Game Design", level: 50 },
-                            { name: "2D/3D Animation (learning)", level: 0 }
-                        ]
-                    },
-                    {
-                        category: "Tools",
-                        icon: "fa-tools",
-                        skills: [
-                            { name: "Git/GitHub", level: 100 },
-                            { name: "Windows", level: 100 },
-                            { name: "Linux/Fedora", level: 100 }
-                        ]
-                    }
-                ],
-                stats: [
-                    { name: "Python", value: 22 },
-                    { name: "JavaScript", value: 34 },
-                    { name: "Flask", value: 1 }
-                ]
-            };
-            await db.collection(COLLECTIONS.SKILLS).doc('main').set(defaultSkills);
-            return defaultSkills;
+            showFeedbackMessage(result.message, 'error');
         }
-    } catch (error) {
-        console.error("Error loading skills:", error);
-        return { skills: [], stats: [] };
-    }
-}
-
-// Add new news
-async function addNews(title, content, category) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
-    }
-    
-    try {
-        const newNews = {
-            title: title,
-            content: content,
-            date: new Date().toISOString().split('T')[0],
-            category: category,
-            author: "BEBARS",
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
         
-        await db.collection(COLLECTIONS.NEWS).add(newNews);
-        showToast("News published successfully!");
-        displayNews();
-    } catch (error) {
-        console.error("Error adding news:", error);
-        showToast("Error publishing news", true);
-    }
+        // Restore button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
 }
 
-// Delete news
-async function deleteNews(id) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
-    }
-    
-    if (confirm("Are you sure you want to delete this news?")) {
-        try {
-            await db.collection(COLLECTIONS.NEWS).doc(id).delete();
-            showToast("News deleted successfully!");
-            displayNews();
-        } catch (error) {
-            console.error("Error deleting news:", error);
-            showToast("Error deleting news", true);
-        }
-    }
+// Email validation helper
+function isValidEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
 }
 
-// Edit news
-async function editNews(id) {
-    if (!isAdmin) {
-        showToast("Admin access required!", true);
-        return;
+// Show feedback message
+function showFeedbackMessage(message, type) {
+    const messageDiv = document.getElementById('feedbackMessageResult');
+    if (!messageDiv) return;
+    
+    messageDiv.innerHTML = `
+        <div class="feedback-alert feedback-${type}">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+            ${message}
+        </div>
+    `;
+    
+    setTimeout(() => {
+        messageDiv.innerHTML = '';
+    }, 5000);
+}
+
+// ==================== VS SECTION UI ====================
+
+// Update VS section UI with like counts
+function updateVSUI(likes) {
+    const bebarsCount = document.getElementById('bebarsLikes');
+    const ahmedCount = document.getElementById('ahmedLikes');
+    const progressBebars = document.getElementById('progressBebars');
+    const progressAhmed = document.getElementById('progressAhmed');
+    const bebarsPercentSpan = document.getElementById('bebarsPercent');
+    const ahmedPercentSpan = document.getElementById('ahmedPercent');
+    
+    const bebars = likes?.bebars || 0;
+    const ahmed = likes?.ahmed || 0;
+    const total = bebars + ahmed;
+    
+    let bebarsPercent = 50;
+    let ahmedPercent = 50;
+    
+    if (total > 0) {
+        bebarsPercent = (bebars / total) * 100;
+        ahmedPercent = (ahmed / total) * 100;
     }
     
-    const doc = await db.collection(COLLECTIONS.NEWS).doc(id).get();
-    if (doc.exists) {
-        const item = doc.data();
-        const newTitle = prompt("Edit title:", item.title);
-        if (newTitle !== null && newTitle.trim()) {
-            const newContent = prompt("Edit content:", item.content);
-            if (newContent !== null && newContent.trim()) {
-                try {
-                    await db.collection(COLLECTIONS.NEWS).doc(id).update({
-                        title: newTitle,
-                        content: newContent,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast("News updated successfully!");
-                    displayNews();
-                } catch (error) {
-                    console.error("Error updating news:", error);
-                    showToast("Error updating news", true);
-                }
+    if (bebarsCount) bebarsCount.textContent = bebars;
+    if (ahmedCount) ahmedCount.textContent = ahmed;
+    if (progressBebars) progressBebars.style.width = `${bebarsPercent}%`;
+    if (progressAhmed) progressAhmed.style.width = `${ahmedPercent}%`;
+    if (bebarsPercentSpan) bebarsPercentSpan.textContent = Math.round(bebarsPercent);
+    if (ahmedPercentSpan) ahmedPercentSpan.textContent = Math.round(ahmedPercent);
+}
+
+// Handle like button click
+async function addLike(user) {
+    if (!user) return;
+    
+    const result = await addLikeToDatabase(user);
+    
+    if (result.success) {
+        // Animate the heart
+        const btn = event?.currentTarget;
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.add('animate');
+                setTimeout(() => icon.classList.remove('animate'), 500);
             }
         }
+        showToast(result.message);
+    } else {
+        showToast(result.message, true);
     }
 }
 
-// ==================== DISPLAY FUNCTIONS ====================
+// Show toast message
+function showToast(message, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.style.background = isError ? 'var(--danger)' : 'var(--gradient)';
+    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i> ${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
 
-// Display news
-async function displayNews() {
+// ==================== NEWS UI ====================
+
+// Display news on page
+async function displayNewsUI() {
     const newsGrid = document.getElementById('newsGrid');
     const news = await loadNews();
+    const isAdmin = typeof isUserAdmin === 'function' ? isUserAdmin() : false;
     
     if (!news || news.length === 0) {
         newsGrid.innerHTML = '<div class="empty-news"><i class="fas fa-newspaper"></i><p>No news yet. Check back soon!</p></div>';
@@ -295,16 +341,51 @@ async function displayNews() {
             ${item.author ? `<div class="news-author"><i class="fas fa-user"></i> ${escapeHtml(item.author)}</div>` : ''}
             ${isAdmin ? `
                 <div class="news-actions">
-                    <button class="btn-danger" onclick="deleteNews('${item.id}')"><i class="fas fa-trash"></i> Delete</button>
-                    <button class="btn-warning" onclick="editNews('${item.id}')"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="btn-danger" onclick="handleDeleteNews('${item.id}')"><i class="fas fa-trash"></i> Delete</button>
+                    <button class="btn-warning" onclick="handleEditNews('${item.id}')"><i class="fas fa-edit"></i> Edit</button>
                 </div>
             ` : ''}
         </div>
     `).join('');
 }
 
-// Display projects
-async function displayProjects() {
+// Handle delete news
+async function handleDeleteNews(id) {
+    if (confirm("Are you sure you want to delete this news?")) {
+        const result = await deleteNews(id);
+        if (result.success) {
+            await displayNewsUI();
+            showToast(result.message);
+        } else {
+            showToast(result.message, true);
+        }
+    }
+}
+
+// Handle edit news
+async function handleEditNews(id) {
+    const item = await getNewsById(id);
+    if (item) {
+        const newTitle = prompt("Edit title:", item.title);
+        if (newTitle !== null && newTitle.trim()) {
+            const newContent = prompt("Edit content:", item.content);
+            if (newContent !== null && newContent.trim()) {
+                const result = await editNews(id, newTitle, newContent);
+                if (result.success) {
+                    await displayNewsUI();
+                    showToast(result.message);
+                } else {
+                    showToast(result.message, true);
+                }
+            }
+        }
+    }
+}
+
+// ==================== PROJECTS UI ====================
+
+// Display projects on page
+async function displayProjectsUI() {
     const projectsGrid = document.getElementById('projectsGrid');
     const projects = await loadProjects();
     
@@ -334,8 +415,10 @@ async function displayProjects() {
     `).join('');
 }
 
-// Display skills
-async function displaySkills() {
+// ==================== SKILLS UI ====================
+
+// Display skills on page
+async function displaySkillsUI() {
     const skillsGrid = document.getElementById('skillsGrid');
     const aboutStats = document.getElementById('aboutStats');
     const data = await loadSkills();
@@ -381,7 +464,7 @@ async function displaySkills() {
             </div>
         `).join('');
         
-        // Animate circles after adding to DOM
+        // Trigger circle animation
         setTimeout(() => {
             const circles = document.querySelectorAll('.stat-circle circle:last-child');
             circles.forEach(circle => {
@@ -394,109 +477,124 @@ async function displaySkills() {
         }, 100);
     }
     
-    // Animate progress bars
+    // Trigger progress bar animation
     setTimeout(() => {
-        const progressBars = document.querySelectorAll('.progress');
-        progressBars.forEach(bar => {
+        document.querySelectorAll('.progress').forEach(bar => {
             const width = bar.getAttribute('data-width');
             bar.style.width = `${width}%`;
         });
     }, 100);
 }
 
-// Helper functions
-function getCategoryName(category) {
-    const categories = {
-        'announcement': '📢 ANNOUNCEMENT',
-        'release': '🚀 RELEASE',
-        'upcoming': '🔜 UPCOMING',
-        'general': '📰 NEWS'
-    };
-    return categories[category] || '📰 NEWS';
-}
+// ==================== ADMIN UI ====================
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function showToast(message, isError = false) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.style.background = isError ? 'var(--danger)' : 'var(--gradient)';
-    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'}"></i> ${message}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// ==================== LOGIN MODAL ====================
-
+// Open login modal
 function openLoginModal() {
     const modal = document.getElementById('loginModal');
+    if (!modal) return;
+    
     modal.classList.add('active');
     modal.innerHTML = `
         <div class="modal-content">
             <h2><i class="fas fa-shield-alt"></i> Admin Login</h2>
             <input type="email" id="adminEmail" placeholder="Email" autocomplete="email">
             <input type="password" id="adminPassword" placeholder="Password" autocomplete="current-password">
-            <button class="btn-primary" onclick="handleLogin()">Login</button>
-            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn-primary" onclick="handleAdminLogin()">Login</button>
+            <button class="btn-secondary" onclick="closeLoginModal()">Cancel</button>
         </div>
     `;
 }
 
-async function handleLogin() {
-    const email = document.getElementById('adminEmail').value;
-    const password = document.getElementById('adminPassword').value;
-    const success = await adminLogin(email, password);
-    if (success) {
-        closeModal();
+// Close login modal
+function closeLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) modal.classList.remove('active');
+}
+
+// Handle admin login
+async function handleAdminLogin() {
+    const email = document.getElementById('adminEmail')?.value;
+    const password = document.getElementById('adminPassword')?.value;
+    
+    if (!email || !password) {
+        showToast("Please enter email and password!", true);
+        return;
+    }
+    
+    const result = await adminLogin(email, password);
+    
+    if (result.success) {
+        closeLoginModal();
+        document.getElementById('adminPanel').style.display = 'block';
+        document.getElementById('adminButton').innerHTML = '<div class="admin-btn" style="background: #4caf50;"><i class="fas fa-check"></i></div>';
+        await displayNewsUI();
+        showToast(result.message);
+    } else {
+        showToast(result.message, true);
     }
 }
 
-function closeModal() {
-    const modal = document.getElementById('loginModal');
-    modal.classList.remove('active');
+// Handle admin logout
+async function handleAdminLogout() {
+    const result = await adminLogout();
+    if (result.success) {
+        document.getElementById('adminPanel').style.display = 'none';
+        document.getElementById('adminButton').innerHTML = '<div class="admin-btn"><i class="fas fa-lock"></i></div>';
+        await displayNewsUI();
+        showToast(result.message);
+    }
 }
 
 // ==================== INITIALIZATION ====================
 
-async function init() {
-    await displayNews();
-    await displayProjects();
-    await displaySkills();
+// Initialize all UI components
+async function initUI() {
+    await displayNewsUI();
+    await displayProjectsUI();
+    await displaySkillsUI();
     
-    // News form
-    const newsForm = document.getElementById('newsForm');
+    // Load VS likes
+    const likes = await getLikeCounts();
+    updateVSUI(likes);
+    
+    // Setup real-time listener for VS
+    setupVSLiveListener((likesData) => {
+        updateVSUI(likesData);
+    });
+    
+    // News form handler
     if (newsForm) {
         newsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const title = document.getElementById('newsTitle').value.trim();
-            const content = document.getElementById('newsContent').value.trim();
-            const category = document.getElementById('newsCategory').value;
+            const title = document.getElementById('newsTitle')?.value.trim();
+            const content = document.getElementById('newsContent')?.value.trim();
+            const category = document.getElementById('newsCategory')?.value;
+            
             if (title && content) {
-                await addNews(title, content, category);
-                document.getElementById('newsTitle').value = '';
-                document.getElementById('newsContent').value = '';
+                const result = await addNews(title, content, category);
+                if (result.success) {
+                    await displayNewsUI();
+                    document.getElementById('newsTitle').value = '';
+                    document.getElementById('newsContent').value = '';
+                    showToast(result.message);
+                } else {
+                    showToast(result.message, true);
+                }
             } else {
                 showToast("Please fill in both title and content!", true);
             }
         });
     }
     
-    // Admin button
-    const adminButton = document.getElementById('adminButton');
+    // Admin button handler
     if (adminButton) {
         adminButton.addEventListener('click', () => {
-            if (isAdmin) {
+            const adminStatus = getAdminStatus();
+            if (adminStatus.isAdmin) {
                 const panel = document.getElementById('adminPanel');
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                if (panel) {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                }
             } else {
                 openLoginModal();
             }
@@ -505,4 +603,4 @@ async function init() {
 }
 
 // Start the application when page loads
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', initUI);

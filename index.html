@@ -162,6 +162,80 @@
         </div>
     </section>
 
+        <!-- Feedback Section -->
+    <section id="feedback" class="feedback-section">
+        <div class="container">
+            <h2 class="section-title">Send <span>Feedback</span></h2>
+            <p class="feedback-subtitle">Found a bug? Have a suggestion? Let me know!</p>
+            
+            <div class="feedback-container">
+                <div class="feedback-info">
+                    <div class="feedback-icon">
+                        <i class="fas fa-bug"></i>
+                    </div>
+                    <h3>Report Issues</h3>
+                    <p>Found something not working? Tell me about it and I'll fix it ASAP.</p>
+                    
+                    <div class="feedback-icon">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <h3>Suggest Features</h3>
+                    <p>Have an idea for a new feature? I'd love to hear it!</p>
+                    
+                    <div class="feedback-icon">
+                        <i class="fas fa-comment-dots"></i>
+                    </div>
+                    <h3>General Feedback</h3>
+                    <p>Any thoughts or comments about the website? Share them here.</p>
+                    
+                    <div class="feedback-email">
+                        <i class="fas fa-envelope"></i>
+                        <span>Direct: bebarsstudio@gmail.com</span>
+                    </div>
+                </div>
+                
+                <form class="feedback-form" id="feedbackForm">
+                    <div class="form-group">
+                        <input type="text" id="feedbackName" placeholder="Your Name" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="feedbackEmail" placeholder="Your Email" required>
+                    </div>
+                    <div class="form-group">
+                        <select id="feedbackType" required>
+                            <option value="">Select Feedback Type</option>
+                            <option value="bug">🐛 Bug Report</option>
+                            <option value="feature">💡 Feature Suggestion</option>
+                            <option value="improvement">⚡ Improvement Idea</option>
+                            <option value="general">📝 General Feedback</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="feedbackSubject" placeholder="Subject" required>
+                    </div>
+                    <div class="form-group">
+                        <textarea id="feedbackMessage" rows="5" placeholder="Describe your feedback in detail..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="feedbackAttachUrl"> 
+                            Include current page URL (helps me debug)
+                        </label>
+                    </div>
+                    <button type="submit" class="btn-primary" id="feedbackSubmitBtn">
+                        <i class="fas fa-paper-plane"></i> Send Feedback
+                    </button>
+                    <div id="feedbackMessageResult"></div>
+                </form>
+            </div>
+            
+            <div class="feedback-note">
+                <i class="fas fa-shield-alt"></i>
+                <p>Your feedback is private and will be sent directly to my email. I'll get back to you as soon as possible!</p>
+            </div>
+        </div>
+    </section>
+
     <!-- About Section -->
     <section id="about" class="about">
         <div class="container">
